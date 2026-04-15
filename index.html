@@ -16,6 +16,23 @@
     h1 {
       margin-top: 0;
     }
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .controls select,
+    .controls button,
+    .table-wrap button {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #fff;
+      padding: 6px 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
     #chartWrap {
       width: 100%;
       min-height: 75vh;
@@ -52,129 +69,238 @@
       font-weight: 600;
       display: none;
     }
+    .table-wrap {
+      margin-top: 14px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    #editPanel {
+      margin-top: 12px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px;
+      display: none;
+    }
+    #editPanel label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 10px;
+    }
+    #editPanel input {
+      width: 120px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 5px 6px;
+    }
+    #status {
+      margin-top: 8px;
+      color: #374151;
+      font-size: 14px;
+      min-height: 18px;
+    }
+    #status.error {
+      color: #b91c1c;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 6px 8px;
+      text-align: left;
+      font-size: 14px;
+    }
+    td input, td select {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 5px 6px;
+    }
+    .size-s { color: #16a34a; font-weight: 700; }
+    .size-m { color: #dc2626; font-weight: 700; }
+    .size-l { color: #2563eb; font-weight: 700; }
   </style>
 </head>
 <body>
   <h1>Histogram czasów realizacji (S/M/L)</h1>
+  <div class="controls">
+    <label for="sizeFilter">Deklarowany rozmiar:</label>
+    <select id="sizeFilter">
+      <option value="ALL">Wszystkie</option>
+      <option value="S">S</option>
+      <option value="M">M</option>
+      <option value="L">L</option>
+    </select>
+  </div>
   <div id="chartWrap">
     <svg id="chart" viewBox="0 0 980 540" preserveAspectRatio="none" aria-label="Histogram czasów realizacji"></svg>
     <div class="legend">
-      <span class="legend-item"><span class="legend-color" style="background:#3b82f6"></span>S</span>
-      <span class="legend-item"><span class="legend-color" style="background:#f59e0b"></span>M</span>
-      <span class="legend-item"><span class="legend-color" style="background:#ef4444"></span>L</span>
+      <span class="legend-item"><span class="legend-color" style="background:#16a34a"></span><span class="size-s">S</span></span>
+      <span class="legend-item"><span class="legend-color" style="background:#dc2626"></span><span class="size-m">M</span></span>
+      <span class="legend-item"><span class="legend-color" style="background:#2563eb"></span><span class="size-l">L</span></span>
+    </div>
+  </div>
+  <div id="editPanel" aria-live="polite">
+    <div id="editPanelText"></div>
+    <div class="controls">
+      <label for="editCountInput">Nowa liczność:
+        <input id="editCountInput" type="number" min="0" step="1" />
+      </label>
+      <button type="button" id="saveEditBtn">Zapisz</button>
+      <button type="button" id="cancelEditBtn">Anuluj</button>
     </div>
   </div>
   <div id="error"></div>
+  <div id="status" role="status" aria-live="polite"></div>
+  <section class="table-wrap">
+    <div class="controls">
+      <strong>Dane histogramu</strong>
+      <button type="button" id="addRowBtn">Dodaj wiersz</button>
+    </div>
+    <table id="dataTable" aria-label="Tabela danych histogramu">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Deklarowany rozmiar</th>
+          <th>Czas realizacji</th>
+          <th>Akcje</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
 
   <script>
-    async function loadAndRenderHistogram() {
+    (async function initHistogramApp() {
       const CSV_FILE_PATH = '1 Histogram czasów realizacji.csv';
       const DEFAULT_BIN_COUNT = 10;
       const BAR_WIDTH_RATIO = 0.75;
       const BAR_GAP_RATIO = 0.25;
+      const BAR_OPACITY = 0.92;
+      const DEFAULT_SIZE = 'S';
+      const COLORS = { s: '#16a34a', m: '#dc2626', l: '#2563eb' };
 
       const errorEl = document.getElementById('error');
-      try {
-        const response = await fetch(CSV_FILE_PATH);
-        if (!response.ok) {
-          throw new Error('Nie udało się wczytać pliku CSV.');
-        }
+      const svg = document.getElementById('chart');
+      const sizeFilterEl = document.getElementById('sizeFilter');
+      const dataTableBody = document.querySelector('#dataTable tbody');
+      const addRowBtn = document.getElementById('addRowBtn');
+      const editPanel = document.getElementById('editPanel');
+      const editPanelText = document.getElementById('editPanelText');
+      const editCountInput = document.getElementById('editCountInput');
+      const saveEditBtn = document.getElementById('saveEditBtn');
+      const cancelEditBtn = document.getElementById('cancelEditBtn');
+      const statusEl = document.getElementById('status');
+      let rows = [];
+      let selectedSize = 'ALL';
+      let editContext = null;
 
-        const raw = await response.text();
-        const lines = raw
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean);
+      const normalizeSize = (value) => {
+        const v = String(value || '').trim().toUpperCase();
+        return v === 'S' || v === 'M' || v === 'L' ? v : null;
+      };
 
-        const smallSizes = [];
-        const mediumSizes = [];
-        const largeSizes = [];
-        const all = [];
+      const sizeClass = (size) => {
+        if (size === 'S') return 'size-s';
+        if (size === 'M') return 'size-m';
+        return 'size-l';
+      };
 
-        for (let i = 1; i < lines.length; i++) {
-          const [size, durationRaw] = lines[i].split(';').map((v) => v.trim());
-          const duration = !durationRaw ? Number.NaN : Number(durationRaw.replace(',', '.'));
-          if (!size || Number.isNaN(duration)) continue;
-          all.push(duration);
+      const filterRows = () => (
+        selectedSize === 'ALL' ? rows : rows.filter((r) => r.size === selectedSize)
+      );
 
-          if (size.toUpperCase() === 'S') smallSizes.push(duration);
-          else if (size.toUpperCase() === 'M') mediumSizes.push(duration);
-          else if (size.toUpperCase() === 'L') largeSizes.push(duration);
-        }
+      const parseNumericInput = (value) => Number(String(value || '').replace(',', '.'));
 
-        if (all.length === 0) throw new Error('Brak poprawnych danych do narysowania histogramu.');
+      const showStatus = (message, isError = false) => {
+        statusEl.textContent = message || '';
+        statusEl.className = isError ? 'error' : '';
+      };
 
+      const createBins = (sourceRows) => {
+        if (sourceRows.length === 0) return null;
+        const all = sourceRows.map((r) => r.duration);
         const min = Math.min(...all);
         const max = Math.max(...all);
         const range = max - min;
         const binCount = range === 0 ? 1 : DEFAULT_BIN_COUNT;
         const binWidth = range === 0 ? 1 : range / binCount;
-
         const bins = Array.from({ length: binCount }, (_, i) => ({
           from: min + i * binWidth,
           to: i === binCount - 1 ? max : min + (i + 1) * binWidth,
+          isLast: i === binCount - 1,
           s: 0, m: 0, l: 0
         }));
 
-        function assign(values, key) {
-          values.forEach((v) => {
-            let idx = range === 0 ? 0 : Math.floor((v - min) / binWidth);
-            if (idx >= binCount) idx = binCount - 1;
-            bins[idx][key] += 1;
-          });
+        sourceRows.forEach(({ size, duration }) => {
+          let idx = range === 0 ? 0 : Math.floor((duration - min) / binWidth);
+          if (idx >= binCount) idx = binCount - 1;
+          bins[idx][size.toLowerCase()] += 1;
+        });
+        return bins;
+      };
+
+      const setBinCount = (size, bin, newCount) => {
+        const inRange = (duration) => {
+          const upperBoundCheck = bin.isLast ? duration <= bin.to : duration < bin.to;
+          return duration >= bin.from && upperBoundCheck;
+        };
+        const matching = [];
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i].size === size && inRange(rows[i].duration)) matching.push(i);
+        }
+        const current = matching.length;
+        if (newCount === current) return;
+        if (newCount > current) {
+          const safeDuration = Number.isFinite(bin.from) && Number.isFinite(bin.to)
+            ? Number(((bin.from + bin.to) / 2).toFixed(2))
+            : 0;
+          for (let i = 0; i < newCount - current; i++) {
+            rows.push({ size, duration: safeDuration });
+          }
+          return;
+        }
+        const toRemove = current - newCount;
+        for (let i = 0; i < toRemove; i++) {
+          const removeIdx = matching[matching.length - 1 - i];
+          rows.splice(removeIdx, 1);
+        }
+      };
+
+      const renderHistogram = () => {
+        svg.innerHTML = '';
+        editPanel.style.display = 'none';
+        editContext = null;
+        const sourceRows = filterRows();
+        const bins = createBins(sourceRows);
+        if (!bins) {
+          const noData = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          noData.setAttribute('x', '490');
+          noData.setAttribute('y', '260');
+          noData.setAttribute('text-anchor', 'middle');
+          noData.setAttribute('fill', '#6b7280');
+          noData.textContent = 'Brak danych dla wybranego rozmiaru.';
+          svg.appendChild(noData);
+          return;
         }
 
-        assign(smallSizes, 's');
-        assign(mediumSizes, 'm');
-        assign(largeSizes, 'l');
-
-        const svg = document.getElementById('chart');
         const W = 980;
         const H = 540;
         const M = { t: 24, r: 24, b: 72, l: 56 };
         const plotW = W - M.l - M.r;
         const plotH = H - M.t - M.b;
         const maxY = Math.max(...bins.map((b) => b.s + b.m + b.l), 1);
-        const barW = plotW / binCount * BAR_WIDTH_RATIO;
-        const gap = plotW / binCount * BAR_GAP_RATIO;
-
-        svg.innerHTML = '';
-
-        const axes = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        axes.innerHTML = `
-          <line x1="${M.l}" y1="${H - M.b}" x2="${W - M.r}" y2="${H - M.b}" stroke="#111827" />
-          <line x1="${M.l}" y1="${M.t}" x2="${M.l}" y2="${H - M.b}" stroke="#111827" />
-        `;
-        svg.appendChild(axes);
-
-        const colors = { s: '#3b82f6', m: '#f59e0b', l: '#ef4444' };
-
-        bins.forEach((bin, i) => {
-          const x = M.l + i * (barW + gap) + gap / 2;
-          let yBase = H - M.b;
-          ['s', 'm', 'l'].forEach((k) => {
-            const v = bin[k];
-            if (!v) return;
-            const h = (v / maxY) * plotH;
-            yBase -= h;
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('x', x.toString());
-            rect.setAttribute('y', yBase.toString());
-            rect.setAttribute('width', barW.toString());
-            rect.setAttribute('height', h.toString());
-            rect.setAttribute('fill', colors[k]);
-            svg.appendChild(rect);
-          });
-
-          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          label.setAttribute('x', (x + barW / 2).toString());
-          label.setAttribute('y', (H - M.b + 18).toString());
-          label.setAttribute('text-anchor', 'middle');
-          label.setAttribute('font-size', '11');
-          label.setAttribute('fill', '#374151');
-          label.textContent = `${Math.round(bin.from)}–${Math.round(bin.to)}`;
-          svg.appendChild(label);
-        });
+        const binCount = bins.length;
+        const barW = (plotW / binCount) * BAR_WIDTH_RATIO;
+        const gap = (plotW / binCount) * BAR_GAP_RATIO;
 
         for (let i = 0; i <= 5; i++) {
           const val = Math.round((maxY / 5) * i);
@@ -196,14 +322,171 @@
           yt.textContent = val.toString();
           svg.appendChild(yt);
         }
+
+        const axes = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        axes.innerHTML = `
+          <line x1="${M.l}" y1="${H - M.b}" x2="${W - M.r}" y2="${H - M.b}" stroke="#111827" />
+          <line x1="${M.l}" y1="${M.t}" x2="${M.l}" y2="${H - M.b}" stroke="#111827" />
+        `;
+        svg.appendChild(axes);
+
+        bins.forEach((bin, i) => {
+          const x = M.l + i * (barW + gap) + gap / 2;
+          let yBase = H - M.b;
+          ['s', 'm', 'l'].forEach((k) => {
+            const v = bin[k];
+            if (!v) return;
+            const h = (v / maxY) * plotH;
+            yBase -= h;
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', x.toString());
+            rect.setAttribute('y', yBase.toString());
+            rect.setAttribute('width', barW.toString());
+            rect.setAttribute('height', h.toString());
+            rect.setAttribute('fill', COLORS[k]);
+            rect.setAttribute('opacity', String(BAR_OPACITY));
+            rect.style.cursor = 'pointer';
+            rect.setAttribute('tabindex', '0');
+            rect.setAttribute('role', 'button');
+            rect.setAttribute(
+              'aria-label',
+              `Edytuj liczność ${k.toUpperCase()} dla zakresu ${Math.round(bin.from)}–${Math.round(bin.to)}. Obecnie ${v}.`
+            );
+            const openEditor = () => {
+              editContext = { size: k.toUpperCase(), bin, current: v };
+              editPanelText.textContent = `Edycja: ${k.toUpperCase()} w przedziale ${Math.round(bin.from)}–${Math.round(bin.to)} (obecnie: ${v})`;
+              editCountInput.value = String(v);
+              editPanel.style.display = 'block';
+              showStatus('');
+              editCountInput.focus();
+            };
+            rect.addEventListener('click', openEditor);
+            rect.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openEditor();
+              }
+            });
+            svg.appendChild(rect);
+          });
+
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', (x + barW / 2).toString());
+          label.setAttribute('y', (H - M.b + 18).toString());
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('font-size', '11');
+          label.setAttribute('fill', '#374151');
+          label.textContent = `${Math.round(bin.from)}–${Math.round(bin.to)}`;
+          svg.appendChild(label);
+        });
+      };
+
+      const renderTable = () => {
+        dataTableBody.innerHTML = rows.map((row, idx) => `
+          <tr data-index="${idx}">
+            <td>${idx + 1}</td>
+            <td>
+              <select class="row-size ${sizeClass(row.size)}" aria-label="Rozmiar wiersza ${idx + 1}">
+                <option value="S" ${row.size === 'S' ? 'selected' : ''}>S</option>
+                <option value="M" ${row.size === 'M' ? 'selected' : ''}>M</option>
+                <option value="L" ${row.size === 'L' ? 'selected' : ''}>L</option>
+              </select>
+            </td>
+            <td><input class="row-duration" type="number" step="0.01" min="0" value="${Number.isFinite(row.duration) ? row.duration : 0}" aria-label="Czas realizacji wiersza ${idx + 1}" /></td>
+            <td><button type="button" class="delete-row" aria-label="Usuń wiersz ${idx + 1}">Usuń</button></td>
+          </tr>
+        `).join('');
+      };
+
+      const renderAll = () => {
+        renderHistogram();
+        renderTable();
+      };
+
+      sizeFilterEl.addEventListener('change', (event) => {
+        selectedSize = event.target.value;
+        renderHistogram();
+      });
+
+      addRowBtn.addEventListener('click', () => {
+        rows.push({ size: selectedSize === 'ALL' ? DEFAULT_SIZE : selectedSize, duration: 0 });
+        renderAll();
+        showStatus('Dodano nowy wiersz danych.');
+      });
+
+      dataTableBody.addEventListener('change', (event) => {
+        const tr = event.target.closest('tr');
+        if (!tr) return;
+        const idx = Number(tr.dataset.index);
+        if (!Number.isInteger(idx) || !rows[idx]) return;
+
+        if (event.target.classList.contains('row-size')) {
+          const next = normalizeSize(event.target.value);
+          if (!next) return;
+          rows[idx].size = next;
+          event.target.className = `row-size ${sizeClass(next)}`;
+        } else if (event.target.classList.contains('row-duration')) {
+          const next = parseNumericInput(event.target.value);
+          if (!Number.isFinite(next) || next < 0) {
+            showStatus('Podaj poprawny czas realizacji (liczba >= 0).', true);
+            event.target.value = String(rows[idx].duration);
+            renderHistogram();
+            return;
+          }
+          rows[idx].duration = next;
+        }
+        renderAll();
+      });
+
+      dataTableBody.addEventListener('click', (event) => {
+        if (!event.target.classList.contains('delete-row')) return;
+        const tr = event.target.closest('tr');
+        if (!tr) return;
+        const idx = Number(tr.dataset.index);
+        if (!Number.isInteger(idx) || !rows[idx]) return;
+        rows.splice(idx, 1);
+        renderAll();
+        showStatus('Usunięto wiersz danych.');
+      });
+
+      saveEditBtn.addEventListener('click', () => {
+        if (!editContext) return;
+        const next = Number(editCountInput.value);
+        if (!Number.isInteger(next) || next < 0) {
+          showStatus('Podaj liczność przedziału jako liczbę całkowitą >= 0.', true);
+          return;
+        }
+        setBinCount(editContext.size, editContext.bin, next);
+        showStatus('Zaktualizowano liczność przedziału.');
+        renderAll();
+      });
+
+      cancelEditBtn.addEventListener('click', () => {
+        editContext = null;
+        editPanel.style.display = 'none';
+        showStatus('Anulowano edycję przedziału.');
+      });
+
+      try {
+        const response = await fetch(CSV_FILE_PATH);
+        if (!response.ok) throw new Error('Nie udało się wczytać pliku CSV.');
+        const raw = await response.text();
+        const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        rows = lines.slice(1).map((line) => {
+          const [sizeRaw, durationRaw] = line.split(';').map((v) => v.trim());
+          const size = normalizeSize(sizeRaw);
+          const duration = parseNumericInput(durationRaw);
+          return size && Number.isFinite(duration) ? { size, duration } : null;
+        }).filter(Boolean);
+        if (!rows.length) throw new Error('Brak poprawnych danych do narysowania histogramu.');
+        errorEl.style.display = 'none';
+        renderAll();
       } catch (err) {
         console.error(err);
         errorEl.style.display = 'block';
         errorEl.textContent = err?.message || 'Wystąpił nieoczekiwany błąd podczas tworzenia histogramu. Sprawdź konsolę przeglądarki.';
       }
-    }
-
-    loadAndRenderHistogram();
+    })();
   </script>
 </body>
 </html>
