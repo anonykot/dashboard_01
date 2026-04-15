@@ -1,110 +1,100 @@
-
 <!doctype html>
 <html lang="pl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Histogram czasów realizacji</title>
+  <title>Dashboard: Histogram i Scatterplot</title>
   <style>
+    :root {
+      --bg-dark: #3a3a3a;
+      --panel-light: #d9d9d9;
+      --text-dark: #111827;
+      --border: #9ca3af;
+      --size-s: #16a34a;
+      --size-m: #dc2626;
+      --size-l: #2563eb;
+    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 24px;
+      padding: 20px;
       font-family: Arial, sans-serif;
-      background: #f7f9fc;
-      color: #1f2937;
+      background: var(--bg-dark);
+      color: #f9fafb;
     }
-    h1 {
-      margin-top: 0;
+    h1 { margin: 0 0 16px 0; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
     }
+    .tab-btn {
+      border: 1px solid #6b7280;
+      border-radius: 8px;
+      background: #4b5563;
+      color: #fff;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #111827;
+      border-color: #111827;
+      font-weight: 700;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
     .controls {
       display: flex;
+      flex-wrap: wrap;
       gap: 10px;
       align-items: center;
       margin-bottom: 10px;
-      flex-wrap: wrap;
     }
-    .controls select,
-    .controls button,
-    .table-wrap button {
-      border: 1px solid #d1d5db;
+    select, button, input {
+      border: 1px solid var(--border);
       border-radius: 6px;
-      background: #fff;
-      padding: 6px 10px;
+      padding: 6px 8px;
       font-size: 14px;
-      cursor: pointer;
+      background: #fff;
+      color: #111827;
     }
-    #chartWrap {
-      width: 100%;
-      min-height: 75vh;
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
+    .panel {
+      background: var(--panel-light);
+      color: var(--text-dark);
+      border: 1px solid #6b7280;
       border-radius: 10px;
       padding: 12px;
-      box-sizing: border-box;
+      margin-bottom: 12px;
     }
-    #chart {
+    svg {
       width: 100%;
-      height: 70vh;
+      height: 68vh;
+      min-height: 420px;
+      background: var(--panel-light);
+      border: 1px solid #6b7280;
+      border-radius: 10px;
+      display: block;
     }
     .legend {
       display: flex;
-      gap: 16px;
-      align-items: center;
-      margin: 8px 0 0 4px;
+      gap: 14px;
+      margin-top: 8px;
       font-size: 14px;
-    }
-    .legend-item {
-      display: inline-flex;
+      color: var(--text-dark);
       align-items: center;
-      gap: 6px;
+      flex-wrap: wrap;
     }
-    .legend-color {
-      width: 12px;
-      height: 12px;
-      border-radius: 2px;
-    }
-    #error {
-      margin-top: 12px;
-      color: #b91c1c;
-      font-weight: 600;
-      display: none;
-    }
+    .legend-item { display: inline-flex; gap: 6px; align-items: center; }
+    .legend-color { width: 12px; height: 12px; border-radius: 2px; }
+    .size-s { color: var(--size-s); font-weight: 700; }
+    .size-m { color: var(--size-m); font-weight: 700; }
+    .size-l { color: var(--size-l); font-weight: 700; }
     .table-wrap {
-      margin-top: 14px;
-      background: #fff;
-      border: 1px solid #e5e7eb;
+      background: var(--panel-light);
+      color: var(--text-dark);
+      border: 1px solid #6b7280;
       border-radius: 10px;
       padding: 12px;
-    }
-    #editPanel {
-      margin-top: 12px;
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 10px;
-      display: none;
-    }
-    #editPanel label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-right: 10px;
-    }
-    #editPanel input {
-      width: 120px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      padding: 5px 6px;
-    }
-    #status {
-      margin-top: 8px;
-      color: #374151;
-      font-size: 14px;
-      min-height: 18px;
-    }
-    #status.error {
-      color: #b91c1c;
-      font-weight: 600;
     }
     table {
       width: 100%;
@@ -112,379 +102,802 @@
       margin-top: 10px;
     }
     th, td {
-      border: 1px solid #e5e7eb;
+      border: 1px solid #9ca3af;
       padding: 6px 8px;
-      text-align: left;
       font-size: 14px;
+      vertical-align: middle;
+      background: #ececec;
     }
-    td input, td select {
-      width: 100%;
-      box-sizing: border-box;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      padding: 5px 6px;
+    td input, td select { width: 100%; }
+    .status {
+      min-height: 18px;
+      font-size: 14px;
+      margin: 4px 0 8px;
+      color: #111827;
     }
-    .size-s { color: #16a34a; font-weight: 700; }
-    .size-m { color: #dc2626; font-weight: 700; }
-    .size-l { color: #2563eb; font-weight: 700; }
+    .status.error { color: #991b1b; font-weight: 700; }
+    .editor {
+      display: none;
+      background: #ececec;
+      border: 1px solid #9ca3af;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 10px;
+      color: #111827;
+    }
+    .editor.active { display: block; }
+    .editor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      margin: 8px 0;
+    }
+    #error {
+      display: none;
+      color: #fecaca;
+      font-weight: 700;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
-  <h1>Histogram czasów realizacji (S/M/L)</h1>
-  <div class="controls">
-    <label for="sizeFilter">Deklarowany rozmiar:</label>
-    <select id="sizeFilter">
-      <option value="ALL">Wszystkie</option>
-      <option value="S">S</option>
-      <option value="M">M</option>
-      <option value="L">L</option>
-    </select>
+  <h1>Dashboard czasów realizacji</h1>
+
+  <div class="tabs" role="tablist" aria-label="Zakładki wykresów">
+    <button class="tab-btn active" id="tabHistogramBtn" role="tab" aria-controls="tabHistogram" aria-selected="true">Histogram</button>
+    <button class="tab-btn" id="tabScatterBtn" role="tab" aria-controls="tabScatter" aria-selected="false">Scatterplot</button>
   </div>
-  <div id="chartWrap">
-    <svg id="chart" viewBox="0 0 980 540" preserveAspectRatio="none" aria-label="Histogram czasów realizacji"></svg>
-    <div class="legend">
-      <span class="legend-item"><span class="legend-color" style="background:#16a34a"></span><span class="size-s">S</span></span>
-      <span class="legend-item"><span class="legend-color" style="background:#dc2626"></span><span class="size-m">M</span></span>
-      <span class="legend-item"><span class="legend-color" style="background:#2563eb"></span><span class="size-l">L</span></span>
+
+  <section id="tabHistogram" class="tab-panel active" role="tabpanel" aria-labelledby="tabHistogramBtn">
+    <div class="panel">
+      <div class="controls">
+        <label for="histSizeFilter">Deklarowany rozmiar:</label>
+        <select id="histSizeFilter">
+          <option value="ALL">Wszystkie</option>
+          <option value="S">S</option>
+          <option value="M">M</option>
+          <option value="L">L</option>
+        </select>
+      </div>
+      <svg id="histChart" viewBox="0 0 980 540" preserveAspectRatio="none" aria-label="Histogram czasów realizacji"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-color" style="background:var(--size-s)"></span><span class="size-s">S</span></span>
+        <span class="legend-item"><span class="legend-color" style="background:var(--size-m)"></span><span class="size-m">M</span></span>
+        <span class="legend-item"><span class="legend-color" style="background:var(--size-l)"></span><span class="size-l">L</span></span>
+      </div>
+      <div id="histEditor" class="editor" aria-live="polite">
+        <div id="histEditorText"></div>
+        <div class="controls">
+          <label for="histEditCount">Nowa liczność:</label>
+          <input id="histEditCount" type="number" min="0" step="1" />
+          <button type="button" id="histEditSave">Zapisz</button>
+          <button type="button" id="histEditCancel">Anuluj</button>
+        </div>
+      </div>
+      <div id="histStatus" class="status" role="status" aria-live="polite"></div>
     </div>
-  </div>
-  <div id="editPanel" aria-live="polite">
-    <div id="editPanelText"></div>
-    <div class="controls">
-      <label for="editCountInput">Nowa liczność:
-        <input id="editCountInput" type="number" min="0" step="1" />
-      </label>
-      <button type="button" id="saveEditBtn">Zapisz</button>
-      <button type="button" id="cancelEditBtn">Anuluj</button>
+
+    <div class="table-wrap">
+      <div class="controls">
+        <strong>Dane histogramu</strong>
+        <button type="button" id="histAddRow">Dodaj wiersz</button>
+      </div>
+      <table aria-label="Tabela danych histogramu">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Deklarowany rozmiar</th>
+            <th>Czas realizacji</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="histTableBody"></tbody>
+      </table>
     </div>
-  </div>
-  <div id="error"></div>
-  <div id="status" role="status" aria-live="polite"></div>
-  <section class="table-wrap">
-    <div class="controls">
-      <strong>Dane histogramu</strong>
-      <button type="button" id="addRowBtn">Dodaj wiersz</button>
-    </div>
-    <table id="dataTable" aria-label="Tabela danych histogramu">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Deklarowany rozmiar</th>
-          <th>Czas realizacji</th>
-          <th>Akcje</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
   </section>
 
-  <script>
-    (async function initHistogramApp() {
-      const CSV_FILE_PATH = '1 Histogram czasów realizacji.csv';
-      const DEFAULT_BIN_COUNT = 10;
-      const BAR_WIDTH_RATIO = 0.75;
-      const BAR_GAP_RATIO = 0.25;
-      const BAR_OPACITY = 0.92;
-      const DEFAULT_SIZE = 'S';
-      const COLORS = { s: '#16a34a', m: '#dc2626', l: '#2563eb' };
+  <section id="tabScatter" class="tab-panel" role="tabpanel" aria-labelledby="tabScatterBtn">
+    <div class="panel">
+      <svg id="scatterChart" viewBox="0 0 980 540" preserveAspectRatio="none" aria-label="Scatterplot czasów realizacji"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-color" style="background:var(--size-s)"></span><span class="size-s">S</span></span>
+        <span class="legend-item"><span class="legend-color" style="background:var(--size-m)"></span><span class="size-m">M</span></span>
+        <span class="legend-item"><span class="legend-color" style="background:var(--size-l)"></span><span class="size-l">L</span></span>
+      </div>
+      <div id="scatterEditor" class="editor" aria-live="polite">
+        <div id="scatterEditorText"></div>
+        <div class="editor-grid">
+          <label>Data zakończenia
+            <input id="scatterEditDate" type="date" />
+          </label>
+          <label>Deklarowany rozmiar
+            <select id="scatterEditSize">
+              <option value="S">S</option>
+              <option value="M">M</option>
+              <option value="L">L</option>
+            </select>
+          </label>
+          <label>Czas realizacji
+            <input id="scatterEditDuration" type="number" min="0" step="0.01" />
+          </label>
+        </div>
+        <div class="controls">
+          <button type="button" id="scatterEditSave">Zapisz</button>
+          <button type="button" id="scatterEditCancel">Anuluj</button>
+        </div>
+      </div>
+      <div id="scatterStatus" class="status" role="status" aria-live="polite"></div>
+    </div>
 
+    <div class="table-wrap">
+      <div class="controls">
+        <strong>Dane scatterplot</strong>
+        <button type="button" id="scatterAddRow">Dodaj wiersz</button>
+      </div>
+      <table aria-label="Tabela danych scatterplot">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Data ukończenia</th>
+            <th>Deklarowany rozmiar</th>
+            <th>Czas realizacji</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="scatterTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div id="error"></div>
+
+  <script>
+    (async function init() {
+      const HIST_CSV = '1 Histogram czasów realizacji.csv';
+      const SCATTER_CSV = '2. Scatterplot czasów realizacji.csv';
+      const COLORS = { S: '#16a34a', M: '#dc2626', L: '#2563eb' };
+
+      const tabHistogramBtn = document.getElementById('tabHistogramBtn');
+      const tabScatterBtn = document.getElementById('tabScatterBtn');
+      const tabHistogram = document.getElementById('tabHistogram');
+      const tabScatter = document.getElementById('tabScatter');
       const errorEl = document.getElementById('error');
-      const svg = document.getElementById('chart');
-      const sizeFilterEl = document.getElementById('sizeFilter');
-      const dataTableBody = document.querySelector('#dataTable tbody');
-      const addRowBtn = document.getElementById('addRowBtn');
-      const editPanel = document.getElementById('editPanel');
-      const editPanelText = document.getElementById('editPanelText');
-      const editCountInput = document.getElementById('editCountInput');
-      const saveEditBtn = document.getElementById('saveEditBtn');
-      const cancelEditBtn = document.getElementById('cancelEditBtn');
-      const statusEl = document.getElementById('status');
-      let rows = [];
-      let selectedSize = 'ALL';
-      let editContext = null;
+
+      const histChart = document.getElementById('histChart');
+      const histSizeFilter = document.getElementById('histSizeFilter');
+      const histTableBody = document.getElementById('histTableBody');
+      const histAddRow = document.getElementById('histAddRow');
+      const histStatus = document.getElementById('histStatus');
+      const histEditor = document.getElementById('histEditor');
+      const histEditorText = document.getElementById('histEditorText');
+      const histEditCount = document.getElementById('histEditCount');
+      const histEditSave = document.getElementById('histEditSave');
+      const histEditCancel = document.getElementById('histEditCancel');
+
+      const scatterChart = document.getElementById('scatterChart');
+      const scatterTableBody = document.getElementById('scatterTableBody');
+      const scatterAddRow = document.getElementById('scatterAddRow');
+      const scatterStatus = document.getElementById('scatterStatus');
+      const scatterEditor = document.getElementById('scatterEditor');
+      const scatterEditorText = document.getElementById('scatterEditorText');
+      const scatterEditDate = document.getElementById('scatterEditDate');
+      const scatterEditSize = document.getElementById('scatterEditSize');
+      const scatterEditDuration = document.getElementById('scatterEditDuration');
+      const scatterEditSave = document.getElementById('scatterEditSave');
+      const scatterEditCancel = document.getElementById('scatterEditCancel');
+
+      let histRows = [];
+      let scatterRows = [];
+      let histSelectedSize = 'ALL';
+      let histEditContext = null;
+      let scatterEditContext = null;
+
+      const showTab = (tab) => {
+        const histActive = tab === 'hist';
+        tabHistogram.classList.toggle('active', histActive);
+        tabScatter.classList.toggle('active', !histActive);
+        tabHistogramBtn.classList.toggle('active', histActive);
+        tabScatterBtn.classList.toggle('active', !histActive);
+        tabHistogramBtn.setAttribute('aria-selected', String(histActive));
+        tabScatterBtn.setAttribute('aria-selected', String(!histActive));
+      };
+
+      tabHistogramBtn.addEventListener('click', () => showTab('hist'));
+      tabScatterBtn.addEventListener('click', () => showTab('scatter'));
 
       const normalizeSize = (value) => {
         const v = String(value || '').trim().toUpperCase();
         return v === 'S' || v === 'M' || v === 'L' ? v : null;
       };
-
-      const sizeClass = (size) => {
-        if (size === 'S') return 'size-s';
-        if (size === 'M') return 'size-m';
-        return 'size-l';
+      const parseNumeric = (v) => Number(String(v || '').replace(',', '.'));
+      const parseDateFromCsv = (ddmmyyyy) => {
+        const parts = String(ddmmyyyy || '').trim().split('.');
+        if (parts.length !== 3) return null;
+        const [d, m, y] = parts.map((p) => Number(p));
+        if (!d || !m || !y) return null;
+        const dt = new Date(y, m - 1, d);
+        return Number.isNaN(dt.getTime()) ? null : dt;
+      };
+      const toDateInputValue = (dt) => {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+      const fromDateInputValue = (value) => {
+        const dt = new Date(value);
+        return Number.isNaN(dt.getTime()) ? null : dt;
+      };
+      const displayDate = (dt) => {
+        const d = String(dt.getDate()).padStart(2, '0');
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const y = dt.getFullYear();
+        return `${d}.${m}.${y}`;
+      };
+      const sizeClass = (size) => size === 'S' ? 'size-s' : size === 'M' ? 'size-m' : 'size-l';
+      const setStatus = (el, message, isError = false) => {
+        el.textContent = message || '';
+        el.className = isError ? 'status error' : 'status';
       };
 
-      const filterRows = () => (
-        selectedSize === 'ALL' ? rows : rows.filter((r) => r.size === selectedSize)
-      );
+      const getHistSourceRows = () => histSelectedSize === 'ALL'
+        ? histRows
+        : histRows.filter((row) => row.size === histSelectedSize);
 
-      const parseNumericInput = (value) => Number(String(value || '').replace(',', '.'));
-
-      const showStatus = (message, isError = false) => {
-        statusEl.textContent = message || '';
-        statusEl.className = isError ? 'error' : '';
-      };
-
-      const createBins = (sourceRows) => {
-        if (sourceRows.length === 0) return null;
-        const all = sourceRows.map((r) => r.duration);
-        const min = Math.min(...all);
-        const max = Math.max(...all);
+      const createHistBins = (rows) => {
+        if (!rows.length) return null;
+        const values = rows.map((r) => r.duration);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
         const range = max - min;
-        const binCount = range === 0 ? 1 : DEFAULT_BIN_COUNT;
-        const binWidth = range === 0 ? 1 : range / binCount;
+        const binCount = range === 0 ? 1 : 10;
+        const width = range === 0 ? 1 : range / binCount;
         const bins = Array.from({ length: binCount }, (_, i) => ({
-          from: min + i * binWidth,
-          to: i === binCount - 1 ? max : min + (i + 1) * binWidth,
+          from: min + i * width,
+          to: i === binCount - 1 ? max : min + (i + 1) * width,
           isLast: i === binCount - 1,
           s: 0, m: 0, l: 0
         }));
-
-        sourceRows.forEach(({ size, duration }) => {
-          let idx = range === 0 ? 0 : Math.floor((duration - min) / binWidth);
+        rows.forEach(({ size, duration }) => {
+          let idx = range === 0 ? 0 : Math.floor((duration - min) / width);
           if (idx >= binCount) idx = binCount - 1;
           bins[idx][size.toLowerCase()] += 1;
         });
         return bins;
       };
 
-      const setBinCount = (size, bin, newCount) => {
-        const inRange = (duration) => {
-          const upperBoundCheck = bin.isLast ? duration <= bin.to : duration < bin.to;
-          return duration >= bin.from && upperBoundCheck;
-        };
-        const matching = [];
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i].size === size && inRange(rows[i].duration)) matching.push(i);
+      const setHistogramBinCount = (size, bin, newCount) => {
+        const inBin = (d) => d >= bin.from && (bin.isLast ? d <= bin.to : d < bin.to);
+        const indexes = [];
+        for (let i = 0; i < histRows.length; i++) {
+          if (histRows[i].size === size && inBin(histRows[i].duration)) indexes.push(i);
         }
-        const current = matching.length;
+        const current = indexes.length;
         if (newCount === current) return;
         if (newCount > current) {
-          const safeDuration = Number.isFinite(bin.from) && Number.isFinite(bin.to)
-            ? Number(((bin.from + bin.to) / 2).toFixed(2))
-            : 0;
-          for (let i = 0; i < newCount - current; i++) {
-            rows.push({ size, duration: safeDuration });
-          }
+          const duration = Number(((bin.from + bin.to) / 2).toFixed(2));
+          for (let i = 0; i < newCount - current; i++) histRows.push({ size, duration });
           return;
         }
-        const toRemove = current - newCount;
-        for (let i = 0; i < toRemove; i++) {
-          const removeIdx = matching[matching.length - 1 - i];
-          rows.splice(removeIdx, 1);
-        }
+        for (let i = current - 1; i >= newCount; i--) histRows.splice(indexes[i], 1);
       };
 
       const renderHistogram = () => {
-        svg.innerHTML = '';
-        editPanel.style.display = 'none';
-        editContext = null;
-        const sourceRows = filterRows();
-        const bins = createBins(sourceRows);
+        histChart.innerHTML = '';
+        histEditor.classList.remove('active');
+        histEditContext = null;
+        const rows = getHistSourceRows();
+        const bins = createHistBins(rows);
         if (!bins) {
-          const noData = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          noData.setAttribute('x', '490');
-          noData.setAttribute('y', '260');
-          noData.setAttribute('text-anchor', 'middle');
-          noData.setAttribute('fill', '#6b7280');
-          noData.textContent = 'Brak danych dla wybranego rozmiaru.';
-          svg.appendChild(noData);
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', '490');
+          text.setAttribute('y', '260');
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('fill', '#4b5563');
+          text.textContent = 'Brak danych dla wybranego rozmiaru';
+          histChart.appendChild(text);
           return;
         }
 
-        const W = 980;
-        const H = 540;
+        const W = 980, H = 540;
         const M = { t: 24, r: 24, b: 72, l: 56 };
         const plotW = W - M.l - M.r;
         const plotH = H - M.t - M.b;
         const maxY = Math.max(...bins.map((b) => b.s + b.m + b.l), 1);
-        const binCount = bins.length;
-        const barW = (plotW / binCount) * BAR_WIDTH_RATIO;
-        const gap = (plotW / binCount) * BAR_GAP_RATIO;
+        const barStep = plotW / bins.length;
+        const barW = barStep * 0.72;
 
         for (let i = 0; i <= 5; i++) {
-          const val = Math.round((maxY / 5) * i);
           const y = H - M.b - (i / 5) * plotH;
-          const grid = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          grid.setAttribute('x1', M.l.toString());
-          grid.setAttribute('y1', y.toString());
-          grid.setAttribute('x2', (W - M.r).toString());
-          grid.setAttribute('y2', y.toString());
-          grid.setAttribute('stroke', '#e5e7eb');
-          svg.appendChild(grid);
+          const val = Math.round((maxY / 5) * i);
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(M.l));
+          line.setAttribute('x2', String(W - M.r));
+          line.setAttribute('y1', String(y));
+          line.setAttribute('y2', String(y));
+          line.setAttribute('stroke', '#9ca3af');
+          histChart.appendChild(line);
 
-          const yt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          yt.setAttribute('x', (M.l - 8).toString());
-          yt.setAttribute('y', (y + 4).toString());
-          yt.setAttribute('text-anchor', 'end');
-          yt.setAttribute('font-size', '11');
-          yt.setAttribute('fill', '#374151');
-          yt.textContent = val.toString();
-          svg.appendChild(yt);
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', String(M.l - 8));
+          label.setAttribute('y', String(y + 4));
+          label.setAttribute('text-anchor', 'end');
+          label.setAttribute('font-size', '11');
+          label.setAttribute('fill', '#1f2937');
+          label.textContent = String(val);
+          histChart.appendChild(label);
         }
 
-        const axes = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        axes.innerHTML = `
-          <line x1="${M.l}" y1="${H - M.b}" x2="${W - M.r}" y2="${H - M.b}" stroke="#111827" />
-          <line x1="${M.l}" y1="${M.t}" x2="${M.l}" y2="${H - M.b}" stroke="#111827" />
-        `;
-        svg.appendChild(axes);
+        const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        xAxis.setAttribute('x1', String(M.l));
+        xAxis.setAttribute('y1', String(H - M.b));
+        xAxis.setAttribute('x2', String(W - M.r));
+        xAxis.setAttribute('y2', String(H - M.b));
+        xAxis.setAttribute('stroke', '#111827');
+        histChart.appendChild(xAxis);
+
+        const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        yAxis.setAttribute('x1', String(M.l));
+        yAxis.setAttribute('y1', String(M.t));
+        yAxis.setAttribute('x2', String(M.l));
+        yAxis.setAttribute('y2', String(H - M.b));
+        yAxis.setAttribute('stroke', '#111827');
+        histChart.appendChild(yAxis);
 
         bins.forEach((bin, i) => {
-          const x = M.l + i * (barW + gap) + gap / 2;
-          let yBase = H - M.b;
+          const x = M.l + i * barStep + (barStep - barW) / 2;
+          let yBottom = H - M.b;
           ['s', 'm', 'l'].forEach((k) => {
-            const v = bin[k];
-            if (!v) return;
-            const h = (v / maxY) * plotH;
-            yBase -= h;
+            const count = bin[k];
+            if (!count) return;
+            const h = (count / maxY) * plotH;
+            yBottom -= h;
             const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('x', x.toString());
-            rect.setAttribute('y', yBase.toString());
-            rect.setAttribute('width', barW.toString());
-            rect.setAttribute('height', h.toString());
-            rect.setAttribute('fill', COLORS[k]);
-            rect.setAttribute('opacity', String(BAR_OPACITY));
+            rect.setAttribute('x', String(x));
+            rect.setAttribute('y', String(yBottom));
+            rect.setAttribute('width', String(barW));
+            rect.setAttribute('height', String(h));
+            rect.setAttribute('fill', COLORS[k.toUpperCase()]);
+            rect.setAttribute('opacity', '0.9');
             rect.style.cursor = 'pointer';
             rect.setAttribute('tabindex', '0');
-            rect.setAttribute('role', 'button');
-            rect.setAttribute(
-              'aria-label',
-              `Edytuj liczność ${k.toUpperCase()} dla zakresu ${Math.round(bin.from)}–${Math.round(bin.to)}. Obecnie ${v}.`
-            );
+            const size = k.toUpperCase();
             const openEditor = () => {
-              editContext = { size: k.toUpperCase(), bin, current: v };
-              editPanelText.textContent = `Edycja: ${k.toUpperCase()} w przedziale ${Math.round(bin.from)}–${Math.round(bin.to)} (obecnie: ${v})`;
-              editCountInput.value = String(v);
-              editPanel.style.display = 'block';
-              showStatus('');
-              editCountInput.focus();
+              histEditContext = { size, bin, count };
+              histEditCount.value = String(count);
+              histEditorText.textContent = `Edycja ${size} w przedziale ${Math.round(bin.from)}-${Math.round(bin.to)} (obecnie: ${count})`;
+              histEditor.classList.add('active');
+              setStatus(histStatus, '');
             };
             rect.addEventListener('click', openEditor);
-            rect.addEventListener('keydown', (event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
+            rect.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
                 openEditor();
               }
             });
-            svg.appendChild(rect);
+            histChart.appendChild(rect);
           });
 
           const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          label.setAttribute('x', (x + barW / 2).toString());
-          label.setAttribute('y', (H - M.b + 18).toString());
+          label.setAttribute('x', String(x + barW / 2));
+          label.setAttribute('y', String(H - M.b + 17));
           label.setAttribute('text-anchor', 'middle');
-          label.setAttribute('font-size', '11');
-          label.setAttribute('fill', '#374151');
-          label.textContent = `${Math.round(bin.from)}–${Math.round(bin.to)}`;
-          svg.appendChild(label);
+          label.setAttribute('font-size', '10');
+          label.setAttribute('fill', '#1f2937');
+          label.textContent = `${Math.round(bin.from)}-${Math.round(bin.to)}`;
+          histChart.appendChild(label);
         });
       };
 
-      const renderTable = () => {
-        dataTableBody.innerHTML = rows.map((row, idx) => `
+      const renderHistTable = () => {
+        histTableBody.innerHTML = histRows.map((r, idx) => `
           <tr data-index="${idx}">
             <td>${idx + 1}</td>
             <td>
-              <select class="row-size ${sizeClass(row.size)}" aria-label="Rozmiar wiersza ${idx + 1}">
-                <option value="S" ${row.size === 'S' ? 'selected' : ''}>S</option>
-                <option value="M" ${row.size === 'M' ? 'selected' : ''}>M</option>
-                <option value="L" ${row.size === 'L' ? 'selected' : ''}>L</option>
+              <select class="hist-size ${sizeClass(r.size)}" aria-label="Rozmiar ${idx + 1}">
+                <option value="S" ${r.size === 'S' ? 'selected' : ''}>S</option>
+                <option value="M" ${r.size === 'M' ? 'selected' : ''}>M</option>
+                <option value="L" ${r.size === 'L' ? 'selected' : ''}>L</option>
               </select>
             </td>
-            <td><input class="row-duration" type="number" step="0.01" min="0" value="${Number.isFinite(row.duration) ? row.duration : 0}" aria-label="Czas realizacji wiersza ${idx + 1}" /></td>
-            <td><button type="button" class="delete-row" aria-label="Usuń wiersz ${idx + 1}">Usuń</button></td>
+            <td><input class="hist-duration" type="number" min="0" step="0.01" value="${r.duration}" /></td>
+            <td><button type="button" class="hist-delete">Usuń</button></td>
           </tr>
         `).join('');
       };
 
-      const renderAll = () => {
+      const renderHistogramAll = () => {
         renderHistogram();
-        renderTable();
+        renderHistTable();
       };
 
-      sizeFilterEl.addEventListener('change', (event) => {
-        selectedSize = event.target.value;
+      histSizeFilter.addEventListener('change', (e) => {
+        histSelectedSize = e.target.value;
         renderHistogram();
       });
 
-      addRowBtn.addEventListener('click', () => {
-        rows.push({ size: selectedSize === 'ALL' ? DEFAULT_SIZE : selectedSize, duration: 0 });
-        renderAll();
-        showStatus('Dodano nowy wiersz danych.');
+      histAddRow.addEventListener('click', () => {
+        histRows.push({ size: histSelectedSize === 'ALL' ? 'S' : histSelectedSize, duration: 0 });
+        renderHistogramAll();
+        setStatus(histStatus, 'Dodano nowy wiersz.');
       });
 
-      dataTableBody.addEventListener('change', (event) => {
-        const tr = event.target.closest('tr');
-        if (!tr) return;
-        const idx = Number(tr.dataset.index);
-        if (!Number.isInteger(idx) || !rows[idx]) return;
+      histTableBody.addEventListener('change', (e) => {
+        const row = e.target.closest('tr');
+        if (!row) return;
+        const idx = Number(row.dataset.index);
+        if (!Number.isInteger(idx) || !histRows[idx]) return;
 
-        if (event.target.classList.contains('row-size')) {
-          const next = normalizeSize(event.target.value);
-          if (!next) return;
-          rows[idx].size = next;
-          event.target.className = `row-size ${sizeClass(next)}`;
-        } else if (event.target.classList.contains('row-duration')) {
-          const next = parseNumericInput(event.target.value);
-          if (!Number.isFinite(next) || next < 0) {
-            showStatus('Podaj poprawny czas realizacji (liczba >= 0).', true);
-            event.target.value = String(rows[idx].duration);
-            renderHistogram();
+        if (e.target.classList.contains('hist-size')) {
+          const size = normalizeSize(e.target.value);
+          if (!size) return;
+          histRows[idx].size = size;
+          e.target.className = `hist-size ${sizeClass(size)}`;
+        }
+        if (e.target.classList.contains('hist-duration')) {
+          const duration = parseNumeric(e.target.value);
+          if (!Number.isFinite(duration) || duration < 0) {
+            setStatus(histStatus, 'Podaj poprawny czas realizacji (>= 0).', true);
+            e.target.value = String(histRows[idx].duration);
             return;
           }
-          rows[idx].duration = next;
+          histRows[idx].duration = duration;
         }
-        renderAll();
+
+        renderHistogramAll();
+        setStatus(histStatus, 'Zaktualizowano dane histogramu.');
       });
 
-      dataTableBody.addEventListener('click', (event) => {
-        if (!event.target.classList.contains('delete-row')) return;
-        const tr = event.target.closest('tr');
-        if (!tr) return;
-        const idx = Number(tr.dataset.index);
-        if (!Number.isInteger(idx) || !rows[idx]) return;
-        rows.splice(idx, 1);
-        renderAll();
-        showStatus('Usunięto wiersz danych.');
+      histTableBody.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('hist-delete')) return;
+        const row = e.target.closest('tr');
+        if (!row) return;
+        const idx = Number(row.dataset.index);
+        if (!Number.isInteger(idx) || !histRows[idx]) return;
+        histRows.splice(idx, 1);
+        renderHistogramAll();
+        setStatus(histStatus, 'Usunięto wiersz histogramu.');
       });
 
-      saveEditBtn.addEventListener('click', () => {
-        if (!editContext) return;
-        const next = Number(editCountInput.value);
+      histEditSave.addEventListener('click', () => {
+        if (!histEditContext) return;
+        const next = Number(histEditCount.value);
         if (!Number.isInteger(next) || next < 0) {
-          showStatus('Podaj liczność przedziału jako liczbę całkowitą >= 0.', true);
+          setStatus(histStatus, 'Liczność musi być liczbą całkowitą >= 0.', true);
           return;
         }
-        setBinCount(editContext.size, editContext.bin, next);
-        showStatus('Zaktualizowano liczność przedziału.');
-        renderAll();
+        setHistogramBinCount(histEditContext.size, histEditContext.bin, next);
+        histEditor.classList.remove('active');
+        histEditContext = null;
+        renderHistogramAll();
+        setStatus(histStatus, 'Zapisano edycję słupka histogramu.');
       });
 
-      cancelEditBtn.addEventListener('click', () => {
-        editContext = null;
-        editPanel.style.display = 'none';
-        showStatus('Anulowano edycję przedziału.');
+      histEditCancel.addEventListener('click', () => {
+        histEditor.classList.remove('active');
+        histEditContext = null;
+        setStatus(histStatus, 'Anulowano edycję słupka.');
+      });
+
+      const linearTrend = (points) => {
+        const n = points.length;
+        if (n < 2) return null;
+        const sx = points.reduce((a, p) => a + p.x, 0);
+        const sy = points.reduce((a, p) => a + p.y, 0);
+        const sxy = points.reduce((a, p) => a + p.x * p.y, 0);
+        const sxx = points.reduce((a, p) => a + p.x * p.x, 0);
+        const den = n * sxx - sx * sx;
+        if (!den) return null;
+        const a = (n * sxy - sx * sy) / den;
+        const b = (sy - a * sx) / n;
+        return { a, b };
+      };
+
+      const renderScatter = () => {
+        scatterChart.innerHTML = '';
+        scatterEditor.classList.remove('active');
+        scatterEditContext = null;
+
+        if (!scatterRows.length) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', '490');
+          text.setAttribute('y', '260');
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('fill', '#4b5563');
+          text.textContent = 'Brak danych scatterplot';
+          scatterChart.appendChild(text);
+          return;
+        }
+
+        const W = 980, H = 540;
+        const M = { t: 24, r: 24, b: 72, l: 64 };
+        const plotW = W - M.l - M.r;
+        const plotH = H - M.t - M.b;
+
+        const minX = Math.min(...scatterRows.map((r) => r.date.getTime()));
+        const maxX = Math.max(...scatterRows.map((r) => r.date.getTime()));
+        const minY = 0;
+        const maxY = Math.max(...scatterRows.map((r) => r.duration), 1);
+        const xSpan = Math.max(maxX - minX, 1);
+        const ySpan = Math.max(maxY - minY, 1);
+
+        const xScale = (x) => M.l + ((x - minX) / xSpan) * plotW;
+        const yScale = (y) => H - M.b - ((y - minY) / ySpan) * plotH;
+
+        for (let i = 0; i <= 5; i++) {
+          const y = H - M.b - (i / 5) * plotH;
+          const val = Math.round((maxY / 5) * i);
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(M.l));
+          line.setAttribute('x2', String(W - M.r));
+          line.setAttribute('y1', String(y));
+          line.setAttribute('y2', String(y));
+          line.setAttribute('stroke', '#9ca3af');
+          scatterChart.appendChild(line);
+
+          const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          txt.setAttribute('x', String(M.l - 8));
+          txt.setAttribute('y', String(y + 4));
+          txt.setAttribute('text-anchor', 'end');
+          txt.setAttribute('font-size', '11');
+          txt.setAttribute('fill', '#1f2937');
+          txt.textContent = String(val);
+          scatterChart.appendChild(txt);
+        }
+
+        const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        xAxis.setAttribute('x1', String(M.l));
+        xAxis.setAttribute('y1', String(H - M.b));
+        xAxis.setAttribute('x2', String(W - M.r));
+        xAxis.setAttribute('y2', String(H - M.b));
+        xAxis.setAttribute('stroke', '#111827');
+        scatterChart.appendChild(xAxis);
+
+        const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        yAxis.setAttribute('x1', String(M.l));
+        yAxis.setAttribute('y1', String(M.t));
+        yAxis.setAttribute('x2', String(M.l));
+        yAxis.setAttribute('y2', String(H - M.b));
+        yAxis.setAttribute('stroke', '#111827');
+        scatterChart.appendChild(yAxis);
+
+        const xTicks = 6;
+        for (let i = 0; i <= xTicks; i++) {
+          const ts = minX + (xSpan / xTicks) * i;
+          const x = xScale(ts);
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', String(x));
+          label.setAttribute('y', String(H - M.b + 18));
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('font-size', '10');
+          label.setAttribute('fill', '#1f2937');
+          label.textContent = displayDate(new Date(ts));
+          scatterChart.appendChild(label);
+        }
+
+        ['S', 'M', 'L'].forEach((size) => {
+          const points = scatterRows
+            .filter((r) => r.size === size)
+            .map((r) => ({ x: r.date.getTime(), y: r.duration }))
+            .sort((a, b) => a.x - b.x);
+
+          const trend = linearTrend(points);
+          if (trend) {
+            const x1 = Math.min(...points.map((p) => p.x));
+            const x2 = Math.max(...points.map((p) => p.x));
+            const y1 = trend.a * x1 + trend.b;
+            const y2 = trend.a * x2 + trend.b;
+            const trendLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            trendLine.setAttribute('x1', String(xScale(x1)));
+            trendLine.setAttribute('y1', String(yScale(y1)));
+            trendLine.setAttribute('x2', String(xScale(x2)));
+            trendLine.setAttribute('y2', String(yScale(y2)));
+            trendLine.setAttribute('stroke', COLORS[size]);
+            trendLine.setAttribute('stroke-width', '2');
+            trendLine.setAttribute('stroke-dasharray', '6 4');
+            scatterChart.appendChild(trendLine);
+          }
+        });
+
+        scatterRows.forEach((row, idx) => {
+          const cx = xScale(row.date.getTime());
+          const cy = yScale(row.duration);
+          const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          point.setAttribute('cx', String(cx));
+          point.setAttribute('cy', String(cy));
+          point.setAttribute('r', '6');
+          point.setAttribute('fill', COLORS[row.size]);
+          point.setAttribute('stroke', '#111827');
+          point.setAttribute('stroke-width', '1');
+          point.style.cursor = 'pointer';
+          point.setAttribute('tabindex', '0');
+          point.setAttribute('aria-label', `Edytuj punkt ${idx + 1}`);
+
+          const openEditor = () => {
+            scatterEditContext = idx;
+            scatterEditorText.textContent = `Edycja punktu ${idx + 1}`;
+            scatterEditDate.value = toDateInputValue(row.date);
+            scatterEditSize.value = row.size;
+            scatterEditDuration.value = String(row.duration);
+            scatterEditor.classList.add('active');
+            setStatus(scatterStatus, '');
+          };
+
+          point.addEventListener('click', openEditor);
+          point.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openEditor();
+            }
+          });
+
+          scatterChart.appendChild(point);
+        });
+      };
+
+      const renderScatterTable = () => {
+        scatterTableBody.innerHTML = scatterRows.map((r, idx) => `
+          <tr data-index="${idx}">
+            <td>${idx + 1}</td>
+            <td><input class="scatter-date" type="date" value="${toDateInputValue(r.date)}" /></td>
+            <td>
+              <select class="scatter-size ${sizeClass(r.size)}">
+                <option value="S" ${r.size === 'S' ? 'selected' : ''}>S</option>
+                <option value="M" ${r.size === 'M' ? 'selected' : ''}>M</option>
+                <option value="L" ${r.size === 'L' ? 'selected' : ''}>L</option>
+              </select>
+            </td>
+            <td><input class="scatter-duration" type="number" min="0" step="0.01" value="${r.duration}" /></td>
+            <td><button type="button" class="scatter-delete">Usuń</button></td>
+          </tr>
+        `).join('');
+      };
+
+      const renderScatterAll = () => {
+        renderScatter();
+        renderScatterTable();
+      };
+
+      scatterAddRow.addEventListener('click', () => {
+        const now = new Date();
+        scatterRows.push({ date: now, size: 'S', duration: 0 });
+        renderScatterAll();
+        setStatus(scatterStatus, 'Dodano nowy punkt.');
+      });
+
+      scatterTableBody.addEventListener('change', (e) => {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const idx = Number(tr.dataset.index);
+        if (!Number.isInteger(idx) || !scatterRows[idx]) return;
+        const row = scatterRows[idx];
+
+        if (e.target.classList.contains('scatter-date')) {
+          const dt = fromDateInputValue(e.target.value);
+          if (!dt) {
+            setStatus(scatterStatus, 'Niepoprawna data.', true);
+            e.target.value = toDateInputValue(row.date);
+            return;
+          }
+          row.date = dt;
+        }
+
+        if (e.target.classList.contains('scatter-size')) {
+          const size = normalizeSize(e.target.value);
+          if (!size) return;
+          row.size = size;
+          e.target.className = `scatter-size ${sizeClass(size)}`;
+        }
+
+        if (e.target.classList.contains('scatter-duration')) {
+          const val = parseNumeric(e.target.value);
+          if (!Number.isFinite(val) || val < 0) {
+            setStatus(scatterStatus, 'Czas realizacji musi być >= 0.', true);
+            e.target.value = String(row.duration);
+            return;
+          }
+          row.duration = val;
+        }
+
+        renderScatterAll();
+        setStatus(scatterStatus, 'Zaktualizowano dane scatterplot.');
+      });
+
+      scatterTableBody.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('scatter-delete')) return;
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const idx = Number(tr.dataset.index);
+        if (!Number.isInteger(idx) || !scatterRows[idx]) return;
+        scatterRows.splice(idx, 1);
+        renderScatterAll();
+        setStatus(scatterStatus, 'Usunięto punkt.');
+      });
+
+      scatterEditSave.addEventListener('click', () => {
+        if (scatterEditContext === null) return;
+        const idx = Number(scatterEditContext);
+        const target = scatterRows[idx];
+        if (!target) return;
+
+        const date = fromDateInputValue(scatterEditDate.value);
+        const size = normalizeSize(scatterEditSize.value);
+        const duration = parseNumeric(scatterEditDuration.value);
+
+        if (!date) {
+          setStatus(scatterStatus, 'Niepoprawna data punktu.', true);
+          return;
+        }
+        if (!size) {
+          setStatus(scatterStatus, 'Niepoprawny rozmiar punktu.', true);
+          return;
+        }
+        if (!Number.isFinite(duration) || duration < 0) {
+          setStatus(scatterStatus, 'Niepoprawny czas realizacji punktu.', true);
+          return;
+        }
+
+        target.date = date;
+        target.size = size;
+        target.duration = duration;
+        scatterEditContext = null;
+        scatterEditor.classList.remove('active');
+        renderScatterAll();
+        setStatus(scatterStatus, 'Zapisano edycję punktu.');
+      });
+
+      scatterEditCancel.addEventListener('click', () => {
+        scatterEditContext = null;
+        scatterEditor.classList.remove('active');
+        setStatus(scatterStatus, 'Anulowano edycję punktu.');
       });
 
       try {
-        const response = await fetch(CSV_FILE_PATH);
-        if (!response.ok) throw new Error('Nie udało się wczytać pliku CSV.');
-        const raw = await response.text();
-        const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-        rows = lines.slice(1).map((line) => {
-          const [sizeRaw, durationRaw] = line.split(';').map((v) => v.trim());
-          const size = normalizeSize(sizeRaw);
-          const duration = parseNumericInput(durationRaw);
-          return size && Number.isFinite(duration) ? { size, duration } : null;
-        }).filter(Boolean);
-        if (!rows.length) throw new Error('Brak poprawnych danych do narysowania histogramu.');
+        const [histRes, scatterRes] = await Promise.all([fetch(HIST_CSV), fetch(SCATTER_CSV)]);
+        if (!histRes.ok) throw new Error('Nie udało się wczytać pliku histogramu.');
+        if (!scatterRes.ok) throw new Error('Nie udało się wczytać pliku scatterplot.');
+
+        const histRaw = await histRes.text();
+        const scatterRaw = await scatterRes.text();
+
+        histRows = histRaw
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .slice(1)
+          .map((line) => {
+            const [sizeRaw, durationRaw] = line.split(';').map((v) => v.trim());
+            const size = normalizeSize(sizeRaw);
+            const duration = parseNumeric(durationRaw);
+            return size && Number.isFinite(duration) ? { size, duration } : null;
+          })
+          .filter(Boolean);
+
+        scatterRows = scatterRaw
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .slice(1)
+          .map((line) => {
+            const [dateRaw, sizeRaw, durationRaw] = line.split(';').map((v) => v.trim());
+            const date = parseDateFromCsv(dateRaw);
+            const size = normalizeSize(sizeRaw);
+            const duration = parseNumeric(durationRaw);
+            return date && size && Number.isFinite(duration) ? { date, size, duration } : null;
+          })
+          .filter(Boolean);
+
+        if (!histRows.length) throw new Error('Brak poprawnych danych histogramu.');
+        if (!scatterRows.length) throw new Error('Brak poprawnych danych scatterplot.');
+
+        renderHistogramAll();
+        renderScatterAll();
         errorEl.style.display = 'none';
-        renderAll();
-      } catch (err) {
-        console.error(err);
+      } catch (error) {
+        console.error(error);
         errorEl.style.display = 'block';
-        errorEl.textContent = err?.message || 'Wystąpił nieoczekiwany błąd podczas tworzenia histogramu. Sprawdź konsolę przeglądarki.';
+        errorEl.textContent = error?.message || 'Wystąpił błąd podczas ładowania danych.';
       }
     })();
   </script>
