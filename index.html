@@ -37,6 +37,7 @@
     }
 
     function buildBins(values, binWidth) {
+      if (!values.length) return [];
       const { min, max } = values.reduce(
         (acc, value) => ({
           min: Math.min(acc.min, value),
@@ -52,7 +53,7 @@
       }
       values.forEach((v) => {
         let idx = Math.floor((v - start) / binWidth);
-        if (idx === bins.length) idx -= 1;
+        if (idx >= bins.length) idx = bins.length - 1;
         if (idx >= 0 && idx < bins.length) bins[idx].count += 1;
       });
       return bins;
