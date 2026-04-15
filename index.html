@@ -1,2 +1,209 @@
 
-test
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Histogram czasów realizacji</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: #f7f9fc;
+      color: #1f2937;
+    }
+    h1 {
+      margin-top: 0;
+    }
+    #chartWrap {
+      width: 100%;
+      min-height: 75vh;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+    #chart {
+      width: 100%;
+      height: 70vh;
+    }
+    .legend {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin: 8px 0 0 4px;
+      font-size: 14px;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+    #error {
+      margin-top: 12px;
+      color: #b91c1c;
+      font-weight: 600;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Histogram czasów realizacji (S/M/L)</h1>
+  <div id="chartWrap">
+    <svg id="chart" viewBox="0 0 980 540" preserveAspectRatio="none" aria-label="Histogram czasów realizacji"></svg>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-color" style="background:#3b82f6"></span>S</span>
+      <span class="legend-item"><span class="legend-color" style="background:#f59e0b"></span>M</span>
+      <span class="legend-item"><span class="legend-color" style="background:#ef4444"></span>L</span>
+    </div>
+  </div>
+  <div id="error"></div>
+
+  <script>
+    async function loadAndRenderHistogram() {
+      const CSV_FILE_PATH = '1 Histogram czasów realizacji.csv';
+      const DEFAULT_BIN_COUNT = 10;
+      const BAR_WIDTH_RATIO = 0.75;
+      const BAR_GAP_RATIO = 0.25;
+
+      const errorEl = document.getElementById('error');
+      try {
+        const response = await fetch(CSV_FILE_PATH);
+        if (!response.ok) {
+          throw new Error('Nie udało się wczytać pliku CSV.');
+        }
+
+        const raw = await response.text();
+        const lines = raw
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+        const smallSizes = [];
+        const mediumSizes = [];
+        const largeSizes = [];
+        const all = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const [size, durationRaw] = lines[i].split(';').map((v) => v.trim());
+          const duration = !durationRaw ? Number.NaN : Number(durationRaw.replace(',', '.'));
+          if (!size || Number.isNaN(duration)) continue;
+          all.push(duration);
+
+          if (size.toUpperCase() === 'S') smallSizes.push(duration);
+          else if (size.toUpperCase() === 'M') mediumSizes.push(duration);
+          else if (size.toUpperCase() === 'L') largeSizes.push(duration);
+        }
+
+        if (all.length === 0) throw new Error('Brak poprawnych danych do narysowania histogramu.');
+
+        const min = Math.min(...all);
+        const max = Math.max(...all);
+        const range = max - min;
+        const binCount = range === 0 ? 1 : DEFAULT_BIN_COUNT;
+        const binWidth = range === 0 ? 1 : range / binCount;
+
+        const bins = Array.from({ length: binCount }, (_, i) => ({
+          from: min + i * binWidth,
+          to: i === binCount - 1 ? max : min + (i + 1) * binWidth,
+          s: 0, m: 0, l: 0
+        }));
+
+        function assign(values, key) {
+          values.forEach((v) => {
+            let idx = range === 0 ? 0 : Math.floor((v - min) / binWidth);
+            if (idx >= binCount) idx = binCount - 1;
+            bins[idx][key] += 1;
+          });
+        }
+
+        assign(smallSizes, 's');
+        assign(mediumSizes, 'm');
+        assign(largeSizes, 'l');
+
+        const svg = document.getElementById('chart');
+        const W = 980;
+        const H = 540;
+        const M = { t: 24, r: 24, b: 72, l: 56 };
+        const plotW = W - M.l - M.r;
+        const plotH = H - M.t - M.b;
+        const maxY = Math.max(...bins.map((b) => b.s + b.m + b.l), 1);
+        const barW = plotW / binCount * BAR_WIDTH_RATIO;
+        const gap = plotW / binCount * BAR_GAP_RATIO;
+
+        svg.innerHTML = '';
+
+        const axes = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        axes.innerHTML = `
+          <line x1="${M.l}" y1="${H - M.b}" x2="${W - M.r}" y2="${H - M.b}" stroke="#111827" />
+          <line x1="${M.l}" y1="${M.t}" x2="${M.l}" y2="${H - M.b}" stroke="#111827" />
+        `;
+        svg.appendChild(axes);
+
+        const colors = { s: '#3b82f6', m: '#f59e0b', l: '#ef4444' };
+
+        bins.forEach((bin, i) => {
+          const x = M.l + i * (barW + gap) + gap / 2;
+          let yBase = H - M.b;
+          ['s', 'm', 'l'].forEach((k) => {
+            const v = bin[k];
+            if (!v) return;
+            const h = (v / maxY) * plotH;
+            yBase -= h;
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', x.toString());
+            rect.setAttribute('y', yBase.toString());
+            rect.setAttribute('width', barW.toString());
+            rect.setAttribute('height', h.toString());
+            rect.setAttribute('fill', colors[k]);
+            svg.appendChild(rect);
+          });
+
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', (x + barW / 2).toString());
+          label.setAttribute('y', (H - M.b + 18).toString());
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('font-size', '11');
+          label.setAttribute('fill', '#374151');
+          label.textContent = `${Math.round(bin.from)}–${Math.round(bin.to)}`;
+          svg.appendChild(label);
+        });
+
+        for (let i = 0; i <= 5; i++) {
+          const val = Math.round((maxY / 5) * i);
+          const y = H - M.b - (i / 5) * plotH;
+          const grid = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          grid.setAttribute('x1', M.l.toString());
+          grid.setAttribute('y1', y.toString());
+          grid.setAttribute('x2', (W - M.r).toString());
+          grid.setAttribute('y2', y.toString());
+          grid.setAttribute('stroke', '#e5e7eb');
+          svg.appendChild(grid);
+
+          const yt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          yt.setAttribute('x', (M.l - 8).toString());
+          yt.setAttribute('y', (y + 4).toString());
+          yt.setAttribute('text-anchor', 'end');
+          yt.setAttribute('font-size', '11');
+          yt.setAttribute('fill', '#374151');
+          yt.textContent = val.toString();
+          svg.appendChild(yt);
+        }
+      } catch (err) {
+        console.error(err);
+        errorEl.style.display = 'block';
+        errorEl.textContent = err?.message || 'Wystąpił nieoczekiwany błąd podczas tworzenia histogramu. Sprawdź konsolę przeglądarki.';
+      }
+    }
+
+    loadAndRenderHistogram();
+  </script>
+</body>
+</html>
