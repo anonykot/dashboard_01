@@ -76,6 +76,36 @@
       border-radius: 10px;
       padding: 12px;
     }
+    #editPanel {
+      margin-top: 12px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px;
+      display: none;
+    }
+    #editPanel label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 10px;
+    }
+    #editPanel input {
+      width: 120px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 5px 6px;
+    }
+    #status {
+      margin-top: 8px;
+      color: #374151;
+      font-size: 14px;
+      min-height: 18px;
+    }
+    #status.error {
+      color: #b91c1c;
+      font-weight: 600;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -118,7 +148,18 @@
       <span class="legend-item"><span class="legend-color" style="background:#2563eb"></span><span class="size-l">L</span></span>
     </div>
   </div>
+  <div id="editPanel" aria-live="polite">
+    <div id="editPanelText"></div>
+    <div class="controls">
+      <label for="editCountInput">Nowa liczność:
+        <input id="editCountInput" type="number" min="0" step="1" />
+      </label>
+      <button type="button" id="saveEditBtn">Zapisz</button>
+      <button type="button" id="cancelEditBtn">Anuluj</button>
+    </div>
+  </div>
   <div id="error"></div>
+  <div id="status" role="status" aria-live="polite"></div>
   <section class="table-wrap">
     <div class="controls">
       <strong>Dane histogramu</strong>
@@ -150,8 +191,15 @@
       const sizeFilterEl = document.getElementById('sizeFilter');
       const dataTableBody = document.querySelector('#dataTable tbody');
       const addRowBtn = document.getElementById('addRowBtn');
+      const editPanel = document.getElementById('editPanel');
+      const editPanelText = document.getElementById('editPanelText');
+      const editCountInput = document.getElementById('editCountInput');
+      const saveEditBtn = document.getElementById('saveEditBtn');
+      const cancelEditBtn = document.getElementById('cancelEditBtn');
+      const statusEl = document.getElementById('status');
       let rows = [];
       let selectedSize = 'ALL';
+      let editContext = null;
 
       const normalizeSize = (value) => {
         const v = String(value || '').trim().toUpperCase();
@@ -167,6 +215,11 @@
       const filterRows = () => (
         selectedSize === 'ALL' ? rows : rows.filter((r) => r.size === selectedSize)
       );
+
+      const showStatus = (message, isError = false) => {
+        statusEl.textContent = message || '';
+        statusEl.className = isError ? 'error' : '';
+      };
 
       const createBins = (sourceRows) => {
         if (sourceRows.length === 0) return null;
@@ -217,6 +270,8 @@
 
       const renderHistogram = () => {
         svg.innerHTML = '';
+        editPanel.style.display = 'none';
+        editContext = null;
         const sourceRows = filterRows();
         const bins = createBins(sourceRows);
         if (!bins) {
@@ -284,20 +339,26 @@
             rect.setAttribute('fill', COLORS[k]);
             rect.setAttribute('opacity', '0.92');
             rect.style.cursor = 'pointer';
-            rect.title = `Kliknij, aby edytować liczność: ${k.toUpperCase()} (${v})`;
-            rect.addEventListener('click', () => {
-              const raw = window.prompt(
-                `Nowa liczność dla ${k.toUpperCase()} w przedziale ${Math.round(bin.from)}–${Math.round(bin.to)}:`,
-                String(v)
-              );
-              if (raw === null) return;
-              const next = Number(raw);
-              if (!Number.isInteger(next) || next < 0) {
-                window.alert('Podaj liczbę całkowitą >= 0.');
-                return;
+            rect.setAttribute('tabindex', '0');
+            rect.setAttribute('role', 'button');
+            rect.setAttribute(
+              'aria-label',
+              `Edytuj liczność ${k.toUpperCase()} dla zakresu ${Math.round(bin.from)} do ${Math.round(bin.to)}. Obecnie ${v}.`
+            );
+            const openEditor = () => {
+              editContext = { size: k.toUpperCase(), bin, current: v };
+              editPanelText.textContent = `Edycja: ${k.toUpperCase()} w przedziale ${Math.round(bin.from)}–${Math.round(bin.to)} (obecnie: ${v})`;
+              editCountInput.value = String(v);
+              editPanel.style.display = 'block';
+              showStatus('');
+              editCountInput.focus();
+            };
+            rect.addEventListener('click', openEditor);
+            rect.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openEditor();
               }
-              setBinCount(k.toUpperCase(), bin, next);
-              renderAll();
             });
             svg.appendChild(rect);
           });
@@ -343,6 +404,7 @@
       addRowBtn.addEventListener('click', () => {
         rows.push({ size: selectedSize === 'ALL' ? 'S' : selectedSize, duration: 0 });
         renderAll();
+        showStatus('Dodano nowy wiersz danych.');
       });
 
       dataTableBody.addEventListener('change', (event) => {
@@ -359,7 +421,7 @@
         } else if (event.target.classList.contains('row-duration')) {
           const next = Number(String(event.target.value).replace(',', '.'));
           if (!Number.isFinite(next) || next < 0) {
-            window.alert('Podaj poprawny czas realizacji (liczba >= 0).');
+            showStatus('Podaj poprawny czas realizacji (liczba >= 0).', true);
             event.target.value = String(rows[idx].duration);
             return;
           }
@@ -376,6 +438,25 @@
         if (!Number.isInteger(idx) || !rows[idx]) return;
         rows.splice(idx, 1);
         renderAll();
+        showStatus('Usunięto wiersz danych.');
+      });
+
+      saveEditBtn.addEventListener('click', () => {
+        if (!editContext) return;
+        const next = Number(editCountInput.value);
+        if (!Number.isInteger(next) || next < 0) {
+          showStatus('Podaj liczbę całkowitą >= 0.', true);
+          return;
+        }
+        setBinCount(editContext.size, editContext.bin, next);
+        showStatus('Zaktualizowano liczność przedziału.');
+        renderAll();
+      });
+
+      cancelEditBtn.addEventListener('click', () => {
+        editContext = null;
+        editPanel.style.display = 'none';
+        showStatus('Anulowano edycję przedziału.');
       });
 
       try {
