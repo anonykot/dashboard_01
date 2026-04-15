@@ -70,7 +70,8 @@
     async function loadAndRenderHistogram() {
       const errorEl = document.getElementById('error');
       try {
-        const response = await fetch('1 Histogram czasów realizacji.csv');
+        const csvFilePath = '1 Histogram czasów realizacji.csv';
+        const response = await fetch(csvFilePath);
         if (!response.ok) {
           throw new Error('Nie udało się wczytać pliku CSV.');
         }
@@ -81,9 +82,9 @@
           .map((line) => line.trim())
           .filter(Boolean);
 
-        const s = [];
-        const m = [];
-        const l = [];
+        const smallSizes = [];
+        const mediumSizes = [];
+        const largeSizes = [];
         const all = [];
 
         for (let i = 1; i < lines.length; i++) {
@@ -92,17 +93,18 @@
           if (!size || Number.isNaN(duration)) continue;
           all.push(duration);
 
-          if (size.toUpperCase() === 'S') s.push(duration);
-          else if (size.toUpperCase() === 'M') m.push(duration);
-          else if (size.toUpperCase() === 'L') l.push(duration);
+          if (size.toUpperCase() === 'S') smallSizes.push(duration);
+          else if (size.toUpperCase() === 'M') mediumSizes.push(duration);
+          else if (size.toUpperCase() === 'L') largeSizes.push(duration);
         }
 
         if (all.length === 0) throw new Error('Brak poprawnych danych do narysowania histogramu.');
 
         const min = Math.min(...all);
         const max = Math.max(...all);
-        const binCount = 10;
-        const binWidth = (max - min) / binCount || 1;
+        const range = max - min;
+        const binCount = range === 0 ? 1 : 10;
+        const binWidth = range === 0 ? 1 : range / binCount;
 
         const bins = Array.from({ length: binCount }, (_, i) => ({
           from: min + i * binWidth,
@@ -112,15 +114,15 @@
 
         function assign(values, key) {
           values.forEach((v) => {
-            let idx = Math.floor((v - min) / binWidth);
+            let idx = range === 0 ? 0 : Math.floor((v - min) / binWidth);
             if (idx >= binCount) idx = binCount - 1;
             bins[idx][key] += 1;
           });
         }
 
-        assign(s, 's');
-        assign(m, 'm');
-        assign(l, 'l');
+        assign(smallSizes, 's');
+        assign(mediumSizes, 'm');
+        assign(largeSizes, 'l');
 
         const svg = document.getElementById('chart');
         const W = 980;
