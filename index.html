@@ -207,7 +207,7 @@
       <div id="scatterEditor" class="editor" aria-live="polite">
         <div id="scatterEditorText"></div>
         <div class="editor-grid">
-          <label>Data zakończenia
+          <label>Data ukończenia
             <input id="scatterEditDate" type="date" />
           </label>
           <label>Deklarowany rozmiar
@@ -468,7 +468,7 @@
               histEditCount.value = String(count);
               histEditorText.textContent = `Edycja ${size} w przedziale ${Math.round(bin.from)}-${Math.round(bin.to)} (obecnie: ${count})`;
               histEditor.classList.add('active');
-              setStatus(histStatus, '');
+              setStatus(histStatus, `Włączono edycję słupka ${size} dla przedziału ${Math.round(bin.from)}-${Math.round(bin.to)}.`);
             };
             rect.addEventListener('click', openEditor);
             rect.addEventListener('keydown', (e) => {
