@@ -75,7 +75,7 @@
 
       const errorEl = document.getElementById('error');
       try {
-        const response = await fetch(encodeURI(CSV_FILE_PATH));
+        const response = await fetch(CSV_FILE_PATH);
         if (!response.ok) {
           throw new Error('Nie udało się wczytać pliku CSV.');
         }
@@ -93,7 +93,7 @@
 
         for (let i = 1; i < lines.length; i++) {
           const [size, durationRaw] = lines[i].split(';').map((v) => v.trim());
-          const duration = durationRaw ? Number(durationRaw.replace(',', '.')) : Number.NaN;
+          const duration = !durationRaw ? Number.NaN : Number(durationRaw.replace(',', '.'));
           if (!size || Number.isNaN(duration)) continue;
           all.push(duration);
 
@@ -197,6 +197,7 @@
           svg.appendChild(yt);
         }
       } catch (err) {
+        console.error(err);
         errorEl.style.display = 'block';
         errorEl.textContent = err?.message || 'Wystąpił nieoczekiwany błąd podczas tworzenia histogramu. Sprawdź konsolę przeglądarki.';
       }
