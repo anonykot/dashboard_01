@@ -19,16 +19,20 @@
 
   <script>
     const CSV_FILE = "1 Histogram czasów realizacji.csv";
+    const BIN_WIDTH_DAYS = 25;
     const svg = document.getElementById("chart");
     const statusEl = document.getElementById("status");
 
     function parseCSV(csvText) {
       const lines = csvText.trim().split(/\r?\n/).filter(Boolean);
-      const header = lines.shift();
-      if (!header) return [];
+      const headerLine = lines.shift();
+      if (!headerLine) return [];
+      const headers = headerLine.split(";").map((h) => h.trim());
+      const timeColIndex = headers.findIndex((h) => h.toLowerCase() === "czas realizacji");
+      if (timeColIndex < 0) return [];
       return lines
         .map((line) => line.split(";"))
-        .map((parts) => Number(parts[1]))
+        .map((parts) => Number(parts[timeColIndex]))
         .filter((n) => Number.isFinite(n));
     }
 
@@ -107,7 +111,7 @@
         const csv = await response.text();
         const values = parseCSV(csv);
         if (!values.length) throw new Error("Brak poprawnych danych liczbowych.");
-        const bins = buildBins(values, 25);
+        const bins = buildBins(values, BIN_WIDTH_DAYS);
         renderHistogram(bins);
         statusEl.textContent = `Wczytano ${values.length} rekordów.`;
       } catch (err) {
