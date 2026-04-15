@@ -133,7 +133,7 @@
   <h1>Histogram czasów realizacji (S/M/L)</h1>
   <div class="controls">
     <label for="sizeFilter">Deklarowany rozmiar:</label>
-    <select id="sizeFilter" aria-label="Filtr deklarowanego rozmiaru">
+    <select id="sizeFilter">
       <option value="ALL">Wszystkie</option>
       <option value="S">S</option>
       <option value="M">M</option>
@@ -257,10 +257,9 @@
         const current = matching.length;
         if (newCount === current) return;
         if (newCount > current) {
-          const midpoint = Number.isFinite(bin.from) && Number.isFinite(bin.to)
-            ? (bin.from + bin.to) / 2
+          const safeDuration = Number.isFinite(bin.from) && Number.isFinite(bin.to)
+            ? Number((((bin.from + bin.to) / 2).toFixed(2)))
             : 0;
-          const safeDuration = Number.isFinite(midpoint) ? Number(midpoint.toFixed(2)) : 0;
           for (let i = 0; i < newCount - current; i++) {
             rows.push({ size, duration: safeDuration });
           }
@@ -348,7 +347,7 @@
             rect.setAttribute('role', 'button');
             rect.setAttribute(
               'aria-label',
-              `Edytuj liczność ${k.toUpperCase()} dla zakresu ${Math.round(bin.from)} do ${Math.round(bin.to)}. Obecnie ${v}.`
+              `Edytuj liczność ${k.toUpperCase()} dla zakresu ${Math.round(bin.from)}–${Math.round(bin.to)}. Obecnie ${v}.`
             );
             const openEditor = () => {
               editContext = { size: k.toUpperCase(), bin, current: v };
@@ -390,7 +389,7 @@
                 <option value="L" ${row.size === 'L' ? 'selected' : ''}>L</option>
               </select>
             </td>
-            <td><input class="row-duration" type="number" step="0.01" min="0" value="${Number.isFinite(row.duration) ? row.duration : 0}" aria-label="Czas realizacji wiersza ${idx + 1}" /></td>
+            <td><input class="row-duration" type="number" step="0.01" min="0" value="${Number.isFinite(row.duration) ? row.duration : 0}" /></td>
             <td><button type="button" class="delete-row">Usuń</button></td>
           </tr>
         `).join('');
@@ -428,6 +427,7 @@
           if (!Number.isFinite(next) || next < 0) {
             showStatus('Podaj poprawny czas realizacji (liczba >= 0).', true);
             event.target.value = String(rows[idx].duration);
+            renderHistogram();
             return;
           }
           rows[idx].duration = next;
@@ -450,7 +450,7 @@
         if (!editContext) return;
         const next = Number(editCountInput.value);
         if (!Number.isInteger(next) || next < 0) {
-          showStatus('Podaj liczbę całkowitą >= 0.', true);
+          showStatus('Podaj liczność przedziału jako liczbę całkowitą >= 0.', true);
           return;
         }
         setBinCount(editContext.size, editContext.bin, next);
