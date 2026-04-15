@@ -249,7 +249,10 @@
       };
 
       const setBinCount = (size, bin, newCount) => {
-        const inRange = (duration) => duration >= bin.from && (bin.isLast ? duration <= bin.to : duration < bin.to);
+        const inRange = (duration) => {
+          const upperBoundCheck = bin.isLast ? duration <= bin.to : duration < bin.to;
+          return duration >= bin.from && upperBoundCheck;
+        };
         const matching = [];
         for (let i = 0; i < rows.length; i++) {
           if (rows[i].size === size && inRange(rows[i].duration)) matching.push(i);
@@ -258,7 +261,7 @@
         if (newCount === current) return;
         if (newCount > current) {
           const safeDuration = Number.isFinite(bin.from) && Number.isFinite(bin.to)
-            ? Number((((bin.from + bin.to) / 2).toFixed(2)))
+            ? Number(((bin.from + bin.to) / 2).toFixed(2))
             : 0;
           for (let i = 0; i < newCount - current; i++) {
             rows.push({ size, duration: safeDuration });
@@ -389,8 +392,8 @@
                 <option value="L" ${row.size === 'L' ? 'selected' : ''}>L</option>
               </select>
             </td>
-            <td><input class="row-duration" type="number" step="0.01" min="0" value="${Number.isFinite(row.duration) ? row.duration : 0}" /></td>
-            <td><button type="button" class="delete-row">Usuń</button></td>
+            <td><input class="row-duration" type="number" step="0.01" min="0" value="${Number.isFinite(row.duration) ? row.duration : 0}" aria-label="Czas realizacji wiersza ${idx + 1}" /></td>
+            <td><button type="button" class="delete-row" aria-label="Usuń wiersz ${idx + 1}">Usuń</button></td>
           </tr>
         `).join('');
       };
