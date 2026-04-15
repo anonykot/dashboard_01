@@ -184,6 +184,8 @@
       const DEFAULT_BIN_COUNT = 10;
       const BAR_WIDTH_RATIO = 0.75;
       const BAR_GAP_RATIO = 0.25;
+      const BAR_OPACITY = 0.92;
+      const DEFAULT_SIZE = 'S';
       const COLORS = { s: '#16a34a', m: '#dc2626', l: '#2563eb' };
 
       const errorEl = document.getElementById('error');
@@ -215,6 +217,8 @@
       const filterRows = () => (
         selectedSize === 'ALL' ? rows : rows.filter((r) => r.size === selectedSize)
       );
+
+      const parseNumericInput = (value) => Number(String(value || '').replace(',', '.'));
 
       const showStatus = (message, isError = false) => {
         statusEl.textContent = message || '';
@@ -255,9 +259,10 @@
         if (newCount > current) {
           const midpoint = Number.isFinite(bin.from) && Number.isFinite(bin.to)
             ? (bin.from + bin.to) / 2
-            : bin.from;
+            : 0;
+          const safeDuration = Number.isFinite(midpoint) ? Number(midpoint.toFixed(2)) : 0;
           for (let i = 0; i < newCount - current; i++) {
-            rows.push({ size, duration: Number(midpoint.toFixed(2)) });
+            rows.push({ size, duration: safeDuration });
           }
           return;
         }
@@ -337,7 +342,7 @@
             rect.setAttribute('width', barW.toString());
             rect.setAttribute('height', h.toString());
             rect.setAttribute('fill', COLORS[k]);
-            rect.setAttribute('opacity', '0.92');
+            rect.setAttribute('opacity', String(BAR_OPACITY));
             rect.style.cursor = 'pointer';
             rect.setAttribute('tabindex', '0');
             rect.setAttribute('role', 'button');
@@ -385,7 +390,7 @@
                 <option value="L" ${row.size === 'L' ? 'selected' : ''}>L</option>
               </select>
             </td>
-            <td><input class="row-duration" type="number" step="0.01" min="0" value="${row.duration}" aria-label="Czas realizacji wiersza ${idx + 1}" /></td>
+            <td><input class="row-duration" type="number" step="0.01" min="0" value="${Number.isFinite(row.duration) ? row.duration : 0}" aria-label="Czas realizacji wiersza ${idx + 1}" /></td>
             <td><button type="button" class="delete-row">Usuń</button></td>
           </tr>
         `).join('');
@@ -402,7 +407,7 @@
       });
 
       addRowBtn.addEventListener('click', () => {
-        rows.push({ size: selectedSize === 'ALL' ? 'S' : selectedSize, duration: 0 });
+        rows.push({ size: selectedSize === 'ALL' ? DEFAULT_SIZE : selectedSize, duration: 0 });
         renderAll();
         showStatus('Dodano nowy wiersz danych.');
       });
@@ -419,7 +424,7 @@
           rows[idx].size = next;
           event.target.className = `row-size ${sizeClass(next)}`;
         } else if (event.target.classList.contains('row-duration')) {
-          const next = Number(String(event.target.value).replace(',', '.'));
+          const next = parseNumericInput(event.target.value);
           if (!Number.isFinite(next) || next < 0) {
             showStatus('Podaj poprawny czas realizacji (liczba >= 0).', true);
             event.target.value = String(rows[idx].duration);
@@ -467,7 +472,7 @@
         rows = lines.slice(1).map((line) => {
           const [sizeRaw, durationRaw] = line.split(';').map((v) => v.trim());
           const size = normalizeSize(sizeRaw);
-          const duration = Number(String(durationRaw || '').replace(',', '.'));
+          const duration = parseNumericInput(durationRaw);
           return size && Number.isFinite(duration) ? { size, duration } : null;
         }).filter(Boolean);
         if (!rows.length) throw new Error('Brak poprawnych danych do narysowania histogramu.');
