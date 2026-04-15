@@ -37,8 +37,13 @@
     }
 
     function buildBins(values, binWidth) {
-      const min = values.reduce((acc, value) => Math.min(acc, value), Number.POSITIVE_INFINITY);
-      const max = values.reduce((acc, value) => Math.max(acc, value), Number.NEGATIVE_INFINITY);
+      const { min, max } = values.reduce(
+        (acc, value) => ({
+          min: Math.min(acc.min, value),
+          max: Math.max(acc.max, value),
+        }),
+        { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY }
+      );
       const start = Math.floor(min / binWidth) * binWidth;
       const end = Math.ceil(max / binWidth) * binWidth;
       const bins = [];
@@ -61,7 +66,8 @@
       const innerH = height - margin.top - margin.bottom;
       const maxCount = Math.max(...bins.map((b) => b.count), 1);
       const barGap = 6;
-      const barW = Math.max(1, innerW / bins.length - barGap);
+      const totalGap = barGap * Math.max(0, bins.length - 1);
+      const barW = Math.max(1, (innerW - totalGap) / bins.length);
 
       svg.innerHTML = "";
       const ns = "http://www.w3.org/2000/svg";
