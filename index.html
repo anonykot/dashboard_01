@@ -68,10 +68,14 @@
 
   <script>
     async function loadAndRenderHistogram() {
+      const CSV_FILE_PATH = '1 Histogram czasów realizacji.csv';
+      const DEFAULT_BIN_COUNT = 10;
+      const BAR_WIDTH_RATIO = 0.75;
+      const BAR_GAP_RATIO = 0.25;
+
       const errorEl = document.getElementById('error');
       try {
-        const csvFilePath = '1 Histogram czasów realizacji.csv';
-        const response = await fetch(csvFilePath);
+        const response = await fetch(CSV_FILE_PATH);
         if (!response.ok) {
           throw new Error('Nie udało się wczytać pliku CSV.');
         }
@@ -103,7 +107,7 @@
         const min = Math.min(...all);
         const max = Math.max(...all);
         const range = max - min;
-        const binCount = range === 0 ? 1 : 10;
+        const binCount = range === 0 ? 1 : DEFAULT_BIN_COUNT;
         const binWidth = range === 0 ? 1 : range / binCount;
 
         const bins = Array.from({ length: binCount }, (_, i) => ({
@@ -131,8 +135,8 @@
         const plotW = W - M.l - M.r;
         const plotH = H - M.t - M.b;
         const maxY = Math.max(...bins.map((b) => b.s + b.m + b.l), 1);
-        const barW = plotW / binCount * 0.75;
-        const gap = plotW / binCount * 0.25;
+        const barW = plotW / binCount * BAR_WIDTH_RATIO;
+        const gap = plotW / binCount * BAR_GAP_RATIO;
 
         svg.innerHTML = '';
 
