@@ -19,6 +19,7 @@
 
   <script>
     const CSV_FILE = "1 Histogram czasów realizacji.csv";
+    const TIME_COLUMN_NAME = "czas realizacji";
     const BIN_WIDTH_DAYS = 25;
     const svg = document.getElementById("chart");
     const statusEl = document.getElementById("status");
@@ -28,7 +29,7 @@
       const headerLine = lines.shift();
       if (!headerLine) return [];
       const headers = headerLine.split(";").map((h) => h.trim());
-      const timeColIndex = headers.findIndex((h) => h.toLowerCase() === "czas realizacji");
+      const timeColIndex = headers.findIndex((h) => h.toLowerCase() === TIME_COLUMN_NAME);
       if (timeColIndex < 0) return [];
       return lines
         .map((line) => line.split(";"))
@@ -60,6 +61,11 @@
     }
 
     function renderHistogram(bins) {
+      if (!bins.length) {
+        svg.innerHTML = "";
+        statusEl.textContent = "Brak danych do narysowania histogramu.";
+        return;
+      }
       const width = Number(svg.getAttribute("width"));
       const height = Number(svg.getAttribute("height"));
       const margin = { top: 30, right: 20, bottom: 80, left: 56 };
