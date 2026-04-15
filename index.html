@@ -256,6 +256,7 @@
       const HIST_CSV = '1 Histogram czasów realizacji.csv';
       const SCATTER_CSV = '2. Scatterplot czasów realizacji.csv';
       const COLORS = { S: '#16a34a', M: '#dc2626', L: '#2563eb' };
+      const getColor = (sizeValue) => COLORS[String(sizeValue || '').toUpperCase()] || '#6b7280';
 
       const tabHistogramBtn = document.getElementById('tabHistogramBtn');
       const tabScatterBtn = document.getElementById('tabScatterBtn');
@@ -457,7 +458,7 @@
             rect.setAttribute('y', String(yBottom));
             rect.setAttribute('width', String(barW));
             rect.setAttribute('height', String(h));
-            rect.setAttribute('fill', COLORS[k.toUpperCase()]);
+            rect.setAttribute('fill', getColor(k));
             rect.setAttribute('opacity', '0.9');
             rect.style.cursor = 'pointer';
             rect.setAttribute('tabindex', '0');
@@ -581,17 +582,17 @@
       });
 
       const linearTrend = (points) => {
-        const n = points.length;
-        if (n < 2) return null;
-        const sx = points.reduce((a, p) => a + p.x, 0);
-        const sy = points.reduce((a, p) => a + p.y, 0);
-        const sxy = points.reduce((a, p) => a + p.x * p.y, 0);
-        const sxx = points.reduce((a, p) => a + p.x * p.x, 0);
-        const den = n * sxx - sx * sx;
-        if (!den) return null;
-        const a = (n * sxy - sx * sy) / den;
-        const b = (sy - a * sx) / n;
-        return { a, b };
+        const pointsCount = points.length;
+        if (pointsCount < 2) return null;
+        const sumX = points.reduce((acc, point) => acc + point.x, 0);
+        const sumY = points.reduce((acc, point) => acc + point.y, 0);
+        const sumXY = points.reduce((acc, point) => acc + point.x * point.y, 0);
+        const sumXSquared = points.reduce((acc, point) => acc + point.x * point.x, 0);
+        const denominator = pointsCount * sumXSquared - sumX * sumX;
+        if (!denominator) return null;
+        const slope = (pointsCount * sumXY - sumX * sumY) / denominator;
+        const intercept = (sumY - slope * sumX) / pointsCount;
+        return { slope, intercept };
       };
 
       const renderScatter = () => {
@@ -686,14 +687,14 @@
           if (trend) {
             const x1 = Math.min(...points.map((p) => p.x));
             const x2 = Math.max(...points.map((p) => p.x));
-            const y1 = trend.a * x1 + trend.b;
-            const y2 = trend.a * x2 + trend.b;
+            const y1 = trend.slope * x1 + trend.intercept;
+            const y2 = trend.slope * x2 + trend.intercept;
             const trendLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             trendLine.setAttribute('x1', String(xScale(x1)));
             trendLine.setAttribute('y1', String(yScale(y1)));
             trendLine.setAttribute('x2', String(xScale(x2)));
             trendLine.setAttribute('y2', String(yScale(y2)));
-            trendLine.setAttribute('stroke', COLORS[size]);
+            trendLine.setAttribute('stroke', getColor(size));
             trendLine.setAttribute('stroke-width', '2');
             trendLine.setAttribute('stroke-dasharray', '6 4');
             scatterChart.appendChild(trendLine);
@@ -707,12 +708,13 @@
           point.setAttribute('cx', String(cx));
           point.setAttribute('cy', String(cy));
           point.setAttribute('r', '6');
-          point.setAttribute('fill', COLORS[row.size]);
+          point.setAttribute('fill', getColor(row.size));
           point.setAttribute('stroke', '#111827');
           point.setAttribute('stroke-width', '1');
           point.style.cursor = 'pointer';
           point.setAttribute('tabindex', '0');
-          point.setAttribute('aria-label', `Edytuj punkt ${idx + 1}`);
+          point.setAttribute('role', 'button');
+          point.setAttribute('aria-label', `Edytuj punkt ${idx + 1}: data ${displayDate(row.date)}, rozmiar ${row.size}, czas realizacji ${row.duration}`);
 
           const openEditor = () => {
             scatterEditContext = idx;
