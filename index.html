@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard: Histogram, Scatterplot i PCB</title>
+  <title>Dashboard: Histogram, Scatterplot i Czas Realizacji PCB</title>
   <style>
     :root {
       --bg-dark: #3a3a3a;
@@ -406,7 +406,7 @@
         const dt = new Date(y, m - 1, d);
         return Number.isNaN(dt.getTime()) ? null : dt;
       };
-      const parseUsMdyDateFromCsv = (usDateString) => {
+      const parseUSMdyDateFromCsv = (usDateString) => {
         const parts = String(usDateString || '').trim().split(/[./-]/);
         if (parts.length !== 3) return null;
         const [m, d, y] = parts.map((p) => Number(p));
@@ -1193,8 +1193,10 @@
       });
 
       pcbAddRow.addEventListener('click', () => {
-        const now = new Date();
-        pcbRows.push({ id: maxPcbId() + 1, started: now, closed: now, cycleTime: 0 });
+        const started = new Date();
+        const closed = new Date(started);
+        closed.setDate(closed.getDate() + 1);
+        pcbRows.push({ id: maxPcbId() + 1, started, closed, cycleTime: 1 });
         renderPcbAll();
         setStatus(pcbStatus, 'Dodano nowy wiersz PCB.');
       });
@@ -1356,8 +1358,8 @@
           .map((line) => {
             const [idRaw, startedRaw, closedRaw, cycleTimeRaw] = line.split(';').map((v) => v.trim());
             const id = Number(idRaw);
-            const started = parseUsMdyDateFromCsv(startedRaw);
-            const closed = parseUsMdyDateFromCsv(closedRaw);
+            const started = parseUSMdyDateFromCsv(startedRaw);
+            const closed = parseUSMdyDateFromCsv(closedRaw);
             const cycleTime = parseNumeric(cycleTimeRaw);
             return Number.isInteger(id) && id > 0 && started && closed && Number.isFinite(cycleTime)
               ? { id, started, closed, cycleTime }
