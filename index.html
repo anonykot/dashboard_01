@@ -254,9 +254,9 @@
     <div class="panel">
       <div class="controls">
         <label for="pcbUmpl">UMPL:</label>
-        <input id="pcbUmpl" type="number" min="0" step="0.01" />
+        <input id="pcbUmpl" type="number" min="0" step="0.01" aria-label="Wartość UMPL" />
         <label for="pcbLnpl">LNPL:</label>
-        <input id="pcbLnpl" type="number" min="0" step="0.01" />
+        <input id="pcbLnpl" type="number" min="0" step="0.01" aria-label="Wartość LNPL" />
       </div>
       <svg id="pcbChart" viewBox="0 0 980 540" preserveAspectRatio="none" aria-label="Wykres PCB czasu realizacji"></svg>
       <div class="legend">
@@ -994,6 +994,8 @@
 
         const W = 980, H = 540;
         const M = { t: 24, r: 64, b: 72, l: 64 };
+        const Y_TICK_COUNT = 5;
+        const MAX_X_TICKS = 6;
         const plotW = W - M.l - M.r;
         const plotH = H - M.t - M.b;
         const points = pcbRows
@@ -1014,9 +1016,9 @@
         const xScale = (x) => M.l + ((x - minX) / xSpan) * plotW;
         const yScale = (y) => H - M.b - ((y - minY) / ySpan) * plotH;
 
-        for (let i = 0; i <= 5; i++) {
-          const y = H - M.b - (i / 5) * plotH;
-          const val = Number(((maxY / 5) * i).toFixed(1));
+        for (let i = 0; i <= Y_TICK_COUNT; i++) {
+          const y = H - M.b - (i / Y_TICK_COUNT) * plotH;
+          const val = Number(((maxY / Y_TICK_COUNT) * i).toFixed(1));
           const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
           line.setAttribute('x1', String(M.l));
           line.setAttribute('x2', String(W - M.r));
@@ -1051,7 +1053,7 @@
         yAxis.setAttribute('stroke', '#111827');
         pcbChart.appendChild(yAxis);
 
-        const xTicks = Math.min(6, Math.max(points.length - 1, 1));
+        const xTicks = Math.min(MAX_X_TICKS, Math.max(points.length - 1, 1));
         for (let i = 0; i <= xTicks; i++) {
           const ts = minX + (xSpan / xTicks) * i;
           const x = xScale(ts);
