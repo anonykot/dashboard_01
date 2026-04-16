@@ -248,6 +248,9 @@
 // ────────────────────────────────────────────────
 const SIMULATIONS = 10000;
 const SPRINT_DAYS = 14;
+// Safety cap on sprints per epic per simulation to prevent infinite loops
+// when all capacity months are 0% – allows up to ~77 years of sprints
+const MAX_SPRINT_ITERATIONS = 2000;
 const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec',
                      'Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 const MONTH_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
@@ -465,12 +468,12 @@ function runForecast() {
 
     for (let e = 0; e < epics.length; e++) {
       const epic = epics[e];
-      // Randomise story count between min and max (uniform)
-      const stories = epic.min + Math.random() * (epic.max - epic.min);
+      // Randomise integer story count between min and max (uniform)
+      const stories = Math.round(epic.min + Math.random() * (epic.max - epic.min));
       let remaining = stories;
       let safety = 0;
 
-      while (remaining > 0 && safety < 2000) {
+      while (remaining > 0 && safety < MAX_SPRINT_ITERATIONS) {
         safety++;
         const sprintStart = addDays(startDate, sprintOffset * SPRINT_DAYS);
         const cap = capacityForDate(sprintStart, capMap);
@@ -598,7 +601,10 @@ function renderGantt(results, startDate, expectedEnd) {
   const FOOT_H = 24;
   const PAD_L = 10;
   const PAD_R = 20;
-  const CHART_W = Math.max(600, Math.min(1100, window.innerWidth - 80));
+  const MIN_CHART_W = 600;
+  const MAX_CHART_W = 1100;
+  const VIEWPORT_PAD = 80;
+  const CHART_W = Math.max(MIN_CHART_W, Math.min(MAX_CHART_W, window.innerWidth - VIEWPORT_PAD));
   const PLOT_W = CHART_W - LABEL_W - PAD_L - PAD_R;
 
   // Date range
