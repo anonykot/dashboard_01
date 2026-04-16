@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MC2 – Prognoza dostarczania epików</title>
+  <style>
+    :root {
+      --bg-dark: #3a3a3a;
+      --panel-light: #d9d9d9;
+      --text-dark: #111827;
+      --border: #9ca3af;
+      --green: #16a34a;
+      --red: #dc2626;
+      --amber: #d97706;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: var(--bg-dark);
+      color: #f9fafb;
+    }
+    h1 { margin: 0 0 16px 0; font-size: 22px; }
+    h2 { margin: 0 0 10px 0; font-size: 15px; font-weight: 700; color: var(--text-dark); }
+    .panel {
+      background: var(--panel-light);
+      color: var(--text-dark);
+      border: 1px solid #6b7280;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    label { font-size: 14px; font-weight: 600; }
+    select, input[type="text"], input[type="date"], input[type="number"] {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 14px;
+      background: #fff;
+      color: #111827;
+    }
+    button {
+      border: 1px solid #1d4ed8;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 14px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button.sec {
+      background: #4b5563;
+      border-color: #374151;
+    }
+    button.sec:hover { background: #374151; }
+    button.del {
+      background: #dc2626;
+      border-color: #b91c1c;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    button.del:hover { background: #b91c1c; }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .radio-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: normal;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+    th {
+      background: #9ca3af;
+      padding: 8px;
+      text-align: left;
+      border: 1px solid #6b7280;
+      font-size: 13px;
+    }
+    td {
+      border: 1px solid #9ca3af;
+      padding: 6px 8px;
+      background: #ececec;
+      vertical-align: middle;
+    }
+    td input, td select { width: 100%; min-width: 50px; }
+    td.label-cell { background: #d1d5db; font-weight: 600; white-space: nowrap; }
+    .capacity-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .cap-month {
+      background: #ececec;
+      border: 1px solid #9ca3af;
+      border-radius: 6px;
+      padding: 8px 10px;
+      min-width: 130px;
+    }
+    .cap-month .cap-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .error-msg { color: #991b1b; font-size: 13px; margin-top: 4px; }
+    /* Results */
+    #resultsPanel { display: none; }
+    #resultsPanel.show { display: block; }
+    .p85 { color: #15803d; font-weight: 700; }
+    .p95 { color: #b91c1c; font-weight: 700; }
+    td.p85-cell { background: #dcfce7; }
+    td.p95-cell { background: #fee2e2; }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .lbox {
+      width: 16px;
+      height: 12px;
+      border-radius: 2px;
+    }
+    .summary-box {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .warn { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+    .bad { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  </style>
+</head>
+<body>
+
+<h1>MC2 – Prognoza dostarczania epików (Monte Carlo)</h1>
+
+<!-- ── USTAWIENIA OGÓLNE ── -->
+<div class="panel">
+  <h2>Ustawienia ogólne</h2>
+  <div class="row">
+    <label for="startDate">Data startu:</label>
+    <input type="date" id="startDate" />
+    <label for="endDate">Oczekiwana data końca:</label>
+    <input type="date" id="endDate" />
+  </div>
+  <div class="row">
+    <label>Skupienie zespołu:</label>
+    <div class="radio-group">
+      <label><input type="radio" name="focus" value="1.00" checked /> 100%</label>
+      <label><input type="radio" name="focus" value="0.75" /> 75%</label>
+      <label><input type="radio" name="focus" value="0.50" /> 50%</label>
+      <label><input type="radio" name="focus" value="0.25" /> 25%</label>
+    </div>
+  </div>
+</div>
+
+<!-- ── TEMPO HISTORYCZNE ── -->
+<div class="panel">
+  <h2>Historyczne tempo dostarczania (historyjki / 2-tygodniowy sprint)</h2>
+  <div class="row">
+    <label for="velInput" style="flex-shrink:0;">Wartości (po przecinku):</label>
+    <input type="text" id="velInput" style="flex:1; min-width:220px;"
+           placeholder="np. 5, 8, 3, 10, 7, 6, 4, 9" />
+  </div>
+  <div id="velError" class="error-msg"></div>
+  <div id="velStats" style="font-size:13px; color:#374151; margin-top:4px;"></div>
+</div>
+
+<!-- ── EPIKI ── -->
+<div class="panel">
+  <h2>Epiki</h2>
+  <table id="epicsTable">
+    <thead>
+      <tr>
+        <th style="width:80px;">#</th>
+        <th>Nazwa</th>
+        <th style="width:130px;">Min historyjek</th>
+        <th style="width:130px;">Max historyjek</th>
+        <th style="width:40px;"></th>
+      </tr>
+    </thead>
+    <tbody id="epicsBody"></tbody>
+  </table>
+  <div style="margin-top:10px;">
+    <button class="sec" onclick="addEpicRow()">+ Dodaj epik</button>
+  </div>
+</div>
+
+<!-- ── CAPACITY MIESIĘCZNE ── -->
+<div class="panel">
+  <h2>Capacity miesięczne (od daty startu)</h2>
+  <p style="font-size:13px; margin:0 0 6px;">
+    Ustaw procentową zdolność dostarczania dla każdego miesiąca (0% = brak pracy, 100% = pełna zdolność).
+  </p>
+  <div id="capacityGrid" class="capacity-grid"></div>
+  <div style="margin-top:8px;">
+    <button class="sec" onclick="buildCapacityGrid()">Odśwież miesiące</button>
+  </div>
+</div>
+
+<!-- ── RUN ── -->
+<div style="margin-bottom:16px;">
+  <button onclick="runForecast()" style="font-size:16px; padding:11px 28px;">
+    ▶ Uruchom prognozę (10 000 symulacji)
+  </button>
+</div>
+
+<!-- ── WYNIKI ── -->
+<div class="panel" id="resultsPanel">
+  <h2>Wyniki prognozy</h2>
+  <div id="resultsTable"></div>
+  <div id="ganttWrap" style="overflow-x:auto; margin-top:16px;"></div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────
+// CONSTANTS
+// ────────────────────────────────────────────────
+const SIMULATIONS = 10000;
+const SPRINT_DAYS = 14;
+// Safety cap on sprints per epic per simulation to prevent infinite loops
+// when all capacity months are 0% – allows up to ~77 years of sprints
+const MAX_SPRINT_ITERATIONS = 2000;
+const MONTH_NAMES = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec',
+                     'Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+const MONTH_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+
+// ────────────────────────────────────────────────
+// INIT
+// ────────────────────────────────────────────────
+let epicSeq = 0;
+
+(function init() {
+  const today = new Date();
+  document.getElementById('startDate').value = toInputDate(today);
+  for (let i = 0; i < 10; i++) addEpicRow();
+  buildCapacityGrid();
+  document.getElementById('startDate').addEventListener('change', buildCapacityGrid);
+  document.getElementById('endDate').addEventListener('change', buildCapacityGrid);
+  document.getElementById('velInput').addEventListener('input', updateVelStats);
+})();
+
+// ────────────────────────────────────────────────
+// HELPERS
+// ────────────────────────────────────────────────
+function toInputDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function displayDate(d) {
+  return d.toLocaleDateString('pl-PL', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+function addDays(d, n) {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+function monthKey(d) {
+  return d.getFullYear() * 100 + (d.getMonth() + 1);
+}
+
+function percentile(arr, p) {
+  const s = [...arr].sort((a, b) => a - b);
+  const idx = (p / 100) * (s.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (idx - lo);
+}
+
+// ────────────────────────────────────────────────
+// VELOCITY STATS
+// ────────────────────────────────────────────────
+function parseVelocities() {
+  const raw = document.getElementById('velInput').value;
+  return raw.split(',')
+    .map(v => parseFloat(v.trim()))
+    .filter(v => !isNaN(v) && v > 0);
+}
+
+function updateVelStats() {
+  const vels = parseVelocities();
+  const el = document.getElementById('velStats');
+  if (vels.length === 0) { el.textContent = ''; return; }
+  const avg = vels.reduce((a, b) => a + b, 0) / vels.length;
+  const p85 = percentile(vels, 85).toFixed(1);
+  const p95 = percentile(vels, 95).toFixed(1);
+  el.textContent =
+    `Próbek: ${vels.length} | Średnia: ${avg.toFixed(1)} | P85: ${p85} | P95: ${p95}`;
+}
+
+// ────────────────────────────────────────────────
+// EPICS TABLE
+// ────────────────────────────────────────────────
+function addEpicRow() {
+  epicSeq++;
+  const n = epicSeq;
+  const tr = document.createElement('tr');
+  tr.dataset.id = n;
+  tr.innerHTML = `
+    <td class="label-cell">Epik ${n}</td>
+    <td><input type="text" placeholder="np. Moduł logowania" /></td>
+    <td><input type="number" min="0" step="1" placeholder="min" /></td>
+    <td><input type="number" min="0" step="1" placeholder="max" /></td>
+    <td><button class="del" onclick="delEpicRow(this)" title="Usuń">✕</button></td>
+  `;
+  document.getElementById('epicsBody').appendChild(tr);
+}
+
+function delEpicRow(btn) {
+  btn.closest('tr').remove();
+}
+
+function getEpics() {
+  const rows = document.querySelectorAll('#epicsBody tr');
+  const epics = [];
+  rows.forEach((row, i) => {
+    const cells = row.querySelectorAll('td');
+    const rawLabel = cells[0].textContent.trim();
+    const name = cells[1].querySelector('input').value.trim();
+    const label = name || rawLabel;
+    const minV = parseFloat(cells[2].querySelector('input').value);
+    const maxV = parseFloat(cells[3].querySelector('input').value);
+    if (isNaN(minV) || minV <= 0) return;
+    const mn = minV;
+    const mx = (!isNaN(maxV) && maxV >= mn) ? maxV : mn;
+    epics.push({ label, min: mn, max: mx, rowIndex: i });
+  });
+  return epics;
+}
+
+// ────────────────────────────────────────────────
+// CAPACITY GRID
+// ────────────────────────────────────────────────
+function buildCapacityGrid() {
+  const startVal = document.getElementById('startDate').value;
+  if (!startVal) return;
+
+  const startD = new Date(startVal);
+  const endVal = document.getElementById('endDate').value;
+  let endD;
+  if (endVal) {
+    endD = new Date(endVal);
+    endD.setMonth(endD.getMonth() + 3);
+  } else {
+    endD = new Date(startD);
+    endD.setMonth(endD.getMonth() + 18);
+  }
+
+  const grid = document.getElementById('capacityGrid');
+
+  // Preserve existing selections
+  const saved = {};
+  grid.querySelectorAll('.cap-month').forEach(el => {
+    saved[el.dataset.key] = el.querySelector('select').value;
+  });
+
+  grid.innerHTML = '';
+
+  let cur = new Date(startD.getFullYear(), startD.getMonth(), 1);
+  const limit = new Date(endD.getFullYear(), endD.getMonth(), 1);
+
+  while (cur <= limit) {
+    const y = cur.getFullYear();
+    const m = cur.getMonth();
+    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+    const div = document.createElement('div');
+    div.className = 'cap-month';
+    div.dataset.key = key;
+
+    const lbl = document.createElement('span');
+    lbl.className = 'cap-label';
+    lbl.textContent = `${MONTH_NAMES[m]} ${y}`;
+
+    const sel = document.createElement('select');
+    [0, 25, 50, 75, 100].forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = `${v}%`;
+      if (v === 100) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (saved[key] !== undefined) sel.value = saved[key];
+
+    div.appendChild(lbl);
+    div.appendChild(sel);
+    grid.appendChild(div);
+    cur.setMonth(cur.getMonth() + 1);
+  }
+}
+
+function getCapacityMap() {
+  const map = {};
+  document.querySelectorAll('.cap-month').forEach(el => {
+    map[el.dataset.key] = parseInt(el.querySelector('select').value, 10) / 100;
+  });
+  return map;
+}
+
+function capacityForDate(d, capMap) {
+  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return capMap[key] !== undefined ? capMap[key] : 1.0;
+}
+
+// ────────────────────────────────────────────────
+// MONTE CARLO FORECAST
+// ────────────────────────────────────────────────
+function runForecast() {
+  // Validate
+  const startVal = document.getElementById('startDate').value;
+  if (!startVal) { alert('Wybierz datę startu!'); return; }
+  const startDate = new Date(startVal);
+
+  const vels = parseVelocities();
+  const velErr = document.getElementById('velError');
+  if (vels.length === 0) {
+    velErr.textContent = 'Podaj co najmniej jedną wartość tempa dostarczania!';
+    return;
+  }
+  velErr.textContent = '';
+
+  const focus = parseFloat(document.querySelector('input[name="focus"]:checked').value);
+  const epics = getEpics();
+  if (epics.length === 0) {
+    alert('Dodaj co najmniej jeden epik z poprawnymi wartościami min!');
+    return;
+  }
+
+  const capMap = getCapacityMap();
+
+  // Simulation: for each run, simulate sprints sequentially for all epics
+  // completionSprints[epicIdx] = array of sprint counts (from sprint 0) when that epic ends
+  const completionSprints = epics.map(() => []);
+
+  for (let sim = 0; sim < SIMULATIONS; sim++) {
+    let sprintOffset = 0; // sprint index from start (global across epics)
+
+    for (let e = 0; e < epics.length; e++) {
+      const epic = epics[e];
+      // Randomise integer story count between min and max (uniform)
+      const stories = Math.round(epic.min + Math.random() * (epic.max - epic.min));
+      let remaining = stories;
+      let safety = 0;
+
+      while (remaining > 0 && safety < MAX_SPRINT_ITERATIONS) {
+        safety++;
+        const sprintStart = addDays(startDate, sprintOffset * SPRINT_DAYS);
+        const cap = capacityForDate(sprintStart, capMap);
+        const rawVel = vels[Math.floor(Math.random() * vels.length)];
+        const effectiveVel = rawVel * focus * cap;
+        if (effectiveVel > 0) remaining -= effectiveVel;
+        sprintOffset++;
+      }
+      completionSprints[e].push(sprintOffset);
+    }
+  }
+
+  // Compute P85 / P95 for each epic
+  const results = epics.map((epic, i) => {
+    const sp = completionSprints[i];
+    const p85sprints = Math.ceil(percentile(sp, 85));
+    const p95sprints = Math.ceil(percentile(sp, 95));
+    return {
+      label: epic.label,
+      min: epic.min,
+      max: epic.max,
+      p85sprints,
+      p95sprints,
+      p85date: addDays(startDate, p85sprints * SPRINT_DAYS),
+      p95date: addDays(startDate, p95sprints * SPRINT_DAYS),
+    };
+  });
+
+  renderResults(results, startDate);
+  const panel = document.getElementById('resultsPanel');
+  panel.classList.add('show');
+  panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ────────────────────────────────────────────────
+// RENDER RESULTS
+// ────────────────────────────────────────────────
+function renderResults(results, startDate) {
+  const endVal = document.getElementById('endDate').value;
+  const expectedEnd = endVal ? new Date(endVal) : null;
+
+  // ── Table ──
+  let html = '<table>';
+  html += '<thead><tr>'
+    + '<th>#</th>'
+    + '<th>Epik</th>'
+    + '<th>Min</th><th>Max</th>'
+    + '<th>P85 sprinty</th><th class="p85">P85 data</th>'
+    + '<th>P95 sprinty</th><th class="p95">P95 data</th>'
+    + (expectedEnd ? '<th>Status vs cel</th>' : '')
+    + '</tr></thead><tbody>';
+
+  results.forEach((r, i) => {
+    let statusCell = '';
+    if (expectedEnd) {
+      if (r.p95date <= expectedEnd) {
+        statusCell = `<td style="background:#dcfce7;color:#166534;font-weight:700;">✓ OK (P95)</td>`;
+      } else if (r.p85date <= expectedEnd) {
+        statusCell = `<td style="background:#fef9c3;color:#854d0e;font-weight:700;">⚠ Ryzyko</td>`;
+      } else {
+        statusCell = `<td style="background:#fee2e2;color:#991b1b;font-weight:700;">✗ Opóźnienie</td>`;
+      }
+    }
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td><strong>${esc(r.label)}</strong></td>
+      <td>${r.min}</td><td>${r.max}</td>
+      <td>${r.p85sprints}</td><td class="p85-cell p85">${displayDate(r.p85date)}</td>
+      <td>${r.p95sprints}</td><td class="p95-cell p95">${displayDate(r.p95date)}</td>
+      ${statusCell}
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+
+  // ── Summary ──
+  const last = results[results.length - 1];
+  let sumClass = 'ok', sumText = '';
+  if (expectedEnd) {
+    const d95 = Math.round((last.p95date - expectedEnd) / 86400000);
+    const d85 = Math.round((last.p85date - expectedEnd) / 86400000);
+    if (d95 <= 0) {
+      sumClass = 'ok';
+      sumText = `✓ Wszystkie epiki zakończone przed celem z 95% prawdopodobieństwem. `
+        + `(P85: ${displayDate(last.p85date)} | P95: ${displayDate(last.p95date)})`;
+    } else if (d85 <= 0) {
+      sumClass = 'warn';
+      sumText = `⚠ P85 mieści się w terminie, ale P95 przekracza cel o ${d95} dni. `
+        + `(P85: ${displayDate(last.p85date)} | P95: ${displayDate(last.p95date)})`;
+    } else {
+      sumClass = 'bad';
+      sumText = `✗ Wszystkie epiki: P85 opóźnienie ${d85} dni, P95 opóźnienie ${d95} dni. `
+        + `(P85: ${displayDate(last.p85date)} | P95: ${displayDate(last.p95date)})`;
+    }
+  } else {
+    sumText = `Wszystkie epiki: <span class="p85">P85 – ${displayDate(last.p85date)}</span>`
+      + ` &nbsp;|&nbsp; <span class="p95">P95 – ${displayDate(last.p95date)}</span>`;
+  }
+
+  html += `<div class="summary-box ${sumClass}">${sumText}</div>`;
+
+  // Legend
+  html += `<div class="legend">
+    <div class="legend-item"><div class="lbox" style="background:#86efac;border:1px solid #16a34a;"></div>P85 – 85% szans na zakończenie</div>
+    <div class="legend-item"><div class="lbox" style="background:#fca5a5;border:1px solid #dc2626;"></div>P95 – 95% szans na zakończenie</div>
+    ${expectedEnd ? '<div class="legend-item"><div class="lbox" style="background:#dc2626;"></div>Oczekiwana data końca</div>' : ''}
+  </div>`;
+
+  document.getElementById('resultsTable').innerHTML = html;
+
+  renderGantt(results, startDate, expectedEnd);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ────────────────────────────────────────────────
+// GANTT CHART (SVG)
+// ────────────────────────────────────────────────
+function renderGantt(results, startDate, expectedEnd) {
+  const LABEL_W = 180;
+  const ROW_H = 40;
+  const HDR_H = 36;
+  const FOOT_H = 24;
+  const PAD_L = 10;
+  const PAD_R = 20;
+  const MIN_CHART_W = 600;
+  const MAX_CHART_W = 1100;
+  const VIEWPORT_PAD = 80;
+  const CHART_W = Math.max(MIN_CHART_W, Math.min(MAX_CHART_W, window.innerWidth - VIEWPORT_PAD));
+  const PLOT_W = CHART_W - LABEL_W - PAD_L - PAD_R;
+
+  // Date range
+  const allDates = [startDate, ...results.flatMap(r => [r.p85date, r.p95date])];
+  if (expectedEnd) allDates.push(expectedEnd);
+  const maxDate = new Date(Math.max(...allDates));
+  // add 2-week buffer
+  maxDate.setDate(maxDate.getDate() + 14);
+  const totalMs = maxDate - startDate;
+
+  function xOf(d) {
+    return LABEL_W + PAD_L + ((d - startDate) / totalMs) * PLOT_W;
+  }
+
+  const SVG_H = HDR_H + results.length * ROW_H + FOOT_H + 10;
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CHART_W} ${SVG_H}"
+    style="width:100%;min-width:${CHART_W}px;height:${SVG_H}px;background:#f9fafb;
+           border:1px solid #9ca3af;border-radius:8px;font-family:Arial,sans-serif;">`;
+
+  // Background
+  svg += `<rect x="0" y="0" width="${CHART_W}" height="${SVG_H}" fill="#f9fafb"/>`;
+
+  // Month grid lines & labels
+  let cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  while (cur <= maxDate) {
+    const x = xOf(cur);
+    if (x >= LABEL_W + PAD_L) {
+      svg += `<line x1="${x.toFixed(1)}" y1="${HDR_H - 8}" x2="${x.toFixed(1)}" y2="${SVG_H - FOOT_H}"
+        stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>`;
+      const lbl = `${MONTH_SHORT[cur.getMonth()]} ${cur.getFullYear()}`;
+      svg += `<text x="${(x + 3).toFixed(1)}" y="${HDR_H - 10}" font-size="10" fill="#64748b">${lbl}</text>`;
+    }
+    cur.setMonth(cur.getMonth() + 1);
+  }
+
+  // Header separator
+  svg += `<line x1="0" y1="${HDR_H}" x2="${CHART_W}" y2="${HDR_H}" stroke="#9ca3af" stroke-width="1"/>`;
+
+  // Expected end line
+  if (expectedEnd) {
+    const ex = xOf(expectedEnd).toFixed(1);
+    svg += `<line x1="${ex}" y1="0" x2="${ex}" y2="${SVG_H - FOOT_H}"
+      stroke="#dc2626" stroke-width="2" stroke-dasharray="5,3"/>`;
+    svg += `<text x="${parseFloat(ex) + 3}" y="14" font-size="11" fill="#dc2626" font-weight="bold">Cel</text>`;
+  }
+
+  // Start line
+  const x0 = xOf(startDate).toFixed(1);
+  svg += `<line x1="${x0}" y1="${HDR_H}" x2="${x0}" y2="${SVG_H - FOOT_H}"
+    stroke="#2563eb" stroke-width="2"/>`;
+
+  // Rows
+  results.forEach((r, i) => {
+    const y = HDR_H + i * ROW_H;
+    const xStart = xOf(startDate);
+    const x85 = xOf(r.p85date);
+    const x95 = xOf(r.p95date);
+
+    // Alternating row background
+    if (i % 2 === 0) {
+      svg += `<rect x="0" y="${y}" width="${CHART_W}" height="${ROW_H}" fill="#f1f5f9" opacity="0.5"/>`;
+    }
+
+    // P95 bar (full range)
+    svg += `<rect x="${xStart.toFixed(1)}" y="${y + 8}" width="${(x95 - xStart).toFixed(1)}"
+      height="${ROW_H - 16}" fill="#fca5a5" rx="3"/>`;
+
+    // P85 bar
+    svg += `<rect x="${xStart.toFixed(1)}" y="${y + 8}" width="${(x85 - xStart).toFixed(1)}"
+      height="${ROW_H - 16}" fill="#86efac" rx="3"/>`;
+
+    // P85 marker line
+    svg += `<line x1="${x85.toFixed(1)}" y1="${y + 4}" x2="${x85.toFixed(1)}" y2="${y + ROW_H - 4}"
+      stroke="#15803d" stroke-width="2"/>`;
+
+    // P95 marker line
+    svg += `<line x1="${x95.toFixed(1)}" y1="${y + 4}" x2="${x95.toFixed(1)}" y2="${y + ROW_H - 4}"
+      stroke="#b91c1c" stroke-width="2"/>`;
+
+    // Epic label (left side)
+    svg += `<text x="${LABEL_W - 8}" y="${y + ROW_H / 2 + 4}" font-size="12" fill="#1e293b"
+      text-anchor="end" font-weight="600">${esc(r.label)}</text>`;
+
+    // Date labels on bars (only if space allows)
+    const barW85 = x85 - xStart;
+    if (barW85 > 60) {
+      const d85txt = displayDate(r.p85date);
+      svg += `<text x="${(xStart + 4).toFixed(1)}" y="${y + ROW_H / 2 + 4}"
+        font-size="10" fill="#166534">${d85txt}</text>`;
+    } else {
+      svg += `<text x="${(x85 + 3).toFixed(1)}" y="${y + ROW_H / 2 - 2}"
+        font-size="10" fill="#166534">${displayDate(r.p85date)}</text>`;
+    }
+    svg += `<text x="${(x95 + 3).toFixed(1)}" y="${y + ROW_H / 2 + 12}"
+      font-size="10" fill="#991b1b">${displayDate(r.p95date)}</text>`;
+
+    // Row separator
+    svg += `<line x1="0" y1="${y + ROW_H}" x2="${CHART_W}" y2="${y + ROW_H}"
+      stroke="#e2e8f0" stroke-width="1"/>`;
+  });
+
+  // Label column separator
+  svg += `<line x1="${LABEL_W}" y1="0" x2="${LABEL_W}" y2="${SVG_H}"
+    stroke="#9ca3af" stroke-width="1"/>`;
+
+  // Footer legend
+  const fy = SVG_H - FOOT_H + 8;
+  svg += `<rect x="${LABEL_W + PAD_L}" y="${fy}" width="14" height="10" fill="#86efac" rx="2"/>`;
+  svg += `<text x="${LABEL_W + PAD_L + 17}" y="${fy + 9}" font-size="11" fill="#374151">P85</text>`;
+  svg += `<rect x="${LABEL_W + PAD_L + 55}" y="${fy}" width="14" height="10" fill="#fca5a5" rx="2"/>`;
+  svg += `<text x="${LABEL_W + PAD_L + 72}" y="${fy + 9}" font-size="11" fill="#374151">P95</text>`;
+  if (expectedEnd) {
+    svg += `<line x1="${LABEL_W + PAD_L + 125}" y1="${fy}" x2="${LABEL_W + PAD_L + 139}" y2="${fy + 10}"
+      stroke="#dc2626" stroke-width="2" stroke-dasharray="4,2"/>`;
+    svg += `<text x="${LABEL_W + PAD_L + 142}" y="${fy + 9}" font-size="11" fill="#374151">Cel</text>`;
+  }
+
+  svg += '</svg>';
+  document.getElementById('ganttWrap').innerHTML = svg;
+}
+</script>
+
+</body>
+</html>
