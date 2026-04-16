@@ -406,8 +406,8 @@
         const dt = new Date(y, m - 1, d);
         return Number.isNaN(dt.getTime()) ? null : dt;
       };
-      const parseUsDateFromCsv = (mmddyyyy) => {
-        const parts = String(mmddyyyy || '').trim().split('.');
+      const parseUsDateFromCsv = (usDateString) => {
+        const parts = String(usDateString || '').trim().split('.');
         if (parts.length !== 3) return null;
         const [m, d, y] = parts.map((p) => Number(p));
         if (!d || !m || !y) return null;
@@ -1164,7 +1164,7 @@
           return;
         }
         if (Number.isFinite(pcbLnplValue) && value < pcbLnplValue) {
-          setStatus(pcbStatus, 'UMPL nie może być mniejszy od LNPL.', true);
+          setStatus(pcbStatus, 'UMPL musi być większy lub równy LNPL.', true);
           pcbUmpl.value = String(pcbUmplValue ?? 0);
           return;
         }
@@ -1181,7 +1181,7 @@
           return;
         }
         if (Number.isFinite(pcbUmplValue) && value > pcbUmplValue) {
-          setStatus(pcbStatus, 'LNPL nie może być większy od UMPL.', true);
+          setStatus(pcbStatus, 'LNPL musi być mniejszy lub równy UMPL.', true);
           pcbLnpl.value = String(pcbLnplValue ?? 0);
           return;
         }
