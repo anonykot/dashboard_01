@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard: Histogram i Scatterplot</title>
+  <title>Dashboard: Histogram, Scatterplot i PCB</title>
   <style>
     :root {
       --bg-dark: #3a3a3a;
@@ -146,6 +146,7 @@
   <div class="tabs" role="tablist" aria-label="Zakładki wykresów">
     <button class="tab-btn active" id="tabHistogramBtn" role="tab" aria-controls="tabHistogram" aria-selected="true">Histogram</button>
     <button class="tab-btn" id="tabScatterBtn" role="tab" aria-controls="tabScatter" aria-selected="false">Scatterplot</button>
+    <button class="tab-btn" id="tabPcbBtn" role="tab" aria-controls="tabPcb" aria-selected="false">PCB Czas realizacji</button>
   </div>
 
   <section id="tabHistogram" class="tab-panel active" role="tabpanel" aria-labelledby="tabHistogramBtn">
@@ -249,19 +250,80 @@
     </div>
   </section>
 
+  <section id="tabPcb" class="tab-panel" role="tabpanel" aria-labelledby="tabPcbBtn">
+    <div class="panel">
+      <div class="controls">
+        <label for="pcbUmpl">UMPL:</label>
+        <input id="pcbUmpl" type="number" min="0" step="0.01" />
+        <label for="pcbLnpl">LNPL:</label>
+        <input id="pcbLnpl" type="number" min="0" step="0.01" />
+      </div>
+      <svg id="pcbChart" viewBox="0 0 980 540" preserveAspectRatio="none" aria-label="Wykres PCB czasu realizacji"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-color" style="background:#dc2626"></span><span style="font-weight:700;color:#dc2626">UMPL</span></span>
+        <span class="legend-item"><span class="legend-color" style="background:#2563eb"></span><span style="font-weight:700;color:#2563eb">LNPL</span></span>
+      </div>
+      <div id="pcbEditor" class="editor" aria-live="polite">
+        <div id="pcbEditorText"></div>
+        <div class="editor-grid">
+          <label>ID
+            <input id="pcbEditId" type="number" min="1" step="1" />
+          </label>
+          <label>Started
+            <input id="pcbEditStarted" type="date" />
+          </label>
+          <label>Closed
+            <input id="pcbEditClosed" type="date" />
+          </label>
+          <label>Cycle Time
+            <input id="pcbEditCycleTime" type="number" min="0" step="0.01" />
+          </label>
+        </div>
+        <div class="controls">
+          <button type="button" id="pcbEditSave">Zapisz</button>
+          <button type="button" id="pcbEditCancel">Anuluj</button>
+        </div>
+      </div>
+      <div id="pcbStatus" class="status" role="status" aria-live="polite"></div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="controls">
+        <strong>Dane PCB</strong>
+        <button type="button" id="pcbAddRow">Dodaj wiersz</button>
+      </div>
+      <table aria-label="Tabela danych PCB">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>ID</th>
+            <th>Started</th>
+            <th>Closed</th>
+            <th>Cycle Time</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody id="pcbTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
   <div id="error"></div>
 
   <script>
     (async function init() {
       const HIST_CSV = '1 Histogram czasów realizacji.csv';
       const SCATTER_CSV = '2. Scatterplot czasów realizacji.csv';
+      const PCB_CSV = '3. PCB Czas realizacji.csv';
       const COLORS = { S: '#16a34a', M: '#dc2626', L: '#2563eb' };
       const getColor = (sizeValue) => COLORS[String(sizeValue || '').toUpperCase()] || '#6b7280';
 
       const tabHistogramBtn = document.getElementById('tabHistogramBtn');
       const tabScatterBtn = document.getElementById('tabScatterBtn');
+      const tabPcbBtn = document.getElementById('tabPcbBtn');
       const tabHistogram = document.getElementById('tabHistogram');
       const tabScatter = document.getElementById('tabScatter');
+      const tabPcb = document.getElementById('tabPcb');
       const errorEl = document.getElementById('error');
 
       const histChart = document.getElementById('histChart');
@@ -287,24 +349,49 @@
       const scatterEditSave = document.getElementById('scatterEditSave');
       const scatterEditCancel = document.getElementById('scatterEditCancel');
 
+      const pcbChart = document.getElementById('pcbChart');
+      const pcbUmpl = document.getElementById('pcbUmpl');
+      const pcbLnpl = document.getElementById('pcbLnpl');
+      const pcbTableBody = document.getElementById('pcbTableBody');
+      const pcbAddRow = document.getElementById('pcbAddRow');
+      const pcbStatus = document.getElementById('pcbStatus');
+      const pcbEditor = document.getElementById('pcbEditor');
+      const pcbEditorText = document.getElementById('pcbEditorText');
+      const pcbEditId = document.getElementById('pcbEditId');
+      const pcbEditStarted = document.getElementById('pcbEditStarted');
+      const pcbEditClosed = document.getElementById('pcbEditClosed');
+      const pcbEditCycleTime = document.getElementById('pcbEditCycleTime');
+      const pcbEditSave = document.getElementById('pcbEditSave');
+      const pcbEditCancel = document.getElementById('pcbEditCancel');
+
       let histRows = [];
       let scatterRows = [];
+      let pcbRows = [];
       let histSelectedSize = 'ALL';
       let histEditContext = null;
       let scatterEditContext = null;
+      let pcbEditContext = null;
+      let pcbUmplValue = null;
+      let pcbLnplValue = null;
 
       const showTab = (tab) => {
         const histActive = tab === 'hist';
+        const scatterActive = tab === 'scatter';
+        const pcbActive = tab === 'pcb';
         tabHistogram.classList.toggle('active', histActive);
-        tabScatter.classList.toggle('active', !histActive);
+        tabScatter.classList.toggle('active', scatterActive);
+        tabPcb.classList.toggle('active', pcbActive);
         tabHistogramBtn.classList.toggle('active', histActive);
-        tabScatterBtn.classList.toggle('active', !histActive);
+        tabScatterBtn.classList.toggle('active', scatterActive);
+        tabPcbBtn.classList.toggle('active', pcbActive);
         tabHistogramBtn.setAttribute('aria-selected', String(histActive));
-        tabScatterBtn.setAttribute('aria-selected', String(!histActive));
+        tabScatterBtn.setAttribute('aria-selected', String(scatterActive));
+        tabPcbBtn.setAttribute('aria-selected', String(pcbActive));
       };
 
       tabHistogramBtn.addEventListener('click', () => showTab('hist'));
       tabScatterBtn.addEventListener('click', () => showTab('scatter'));
+      tabPcbBtn.addEventListener('click', () => showTab('pcb'));
 
       const normalizeSize = (value) => {
         const v = String(value || '').trim().toUpperCase();
@@ -315,6 +402,14 @@
         const parts = String(ddmmyyyy || '').trim().split('.');
         if (parts.length !== 3) return null;
         const [d, m, y] = parts.map((p) => Number(p));
+        if (!d || !m || !y) return null;
+        const dt = new Date(y, m - 1, d);
+        return Number.isNaN(dt.getTime()) ? null : dt;
+      };
+      const parseUsDateFromCsv = (mmddyyyy) => {
+        const parts = String(mmddyyyy || '').trim().split('.');
+        if (parts.length !== 3) return null;
+        const [m, d, y] = parts.map((p) => Number(p));
         if (!d || !m || !y) return null;
         const dt = new Date(y, m - 1, d);
         return Number.isNaN(dt.getTime()) ? null : dt;
@@ -855,13 +950,372 @@
         setStatus(scatterStatus, 'Anulowano edycję punktu.');
       });
 
+      const computePcbLimits = (rows) => {
+        if (!rows.length) return { umpl: 0, lnpl: 0 };
+        const values = rows.map((row) => row.cycleTime);
+        const mean = values.reduce((acc, value) => acc + value, 0) / values.length;
+        const variance = values.reduce((acc, value) => acc + (value - mean) ** 2, 0) / values.length;
+        const stdDev = Math.sqrt(variance);
+        return {
+          umpl: Number((mean + stdDev).toFixed(2)),
+          lnpl: Number(Math.max(mean - stdDev, 0).toFixed(2))
+        };
+      };
+
+      const maxPcbId = () => pcbRows.reduce((acc, row) => Math.max(acc, row.id), 0);
+
+      const ensurePcbLimits = () => {
+        if (!Number.isFinite(pcbUmplValue) || !Number.isFinite(pcbLnplValue)) {
+          const limits = computePcbLimits(pcbRows);
+          pcbUmplValue = limits.umpl;
+          pcbLnplValue = limits.lnpl;
+        }
+        pcbUmpl.value = String(pcbUmplValue);
+        pcbLnpl.value = String(pcbLnplValue);
+      };
+
+      const renderPcb = () => {
+        pcbChart.innerHTML = '';
+        pcbEditor.classList.remove('active');
+        pcbEditContext = null;
+
+        if (!pcbRows.length) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', '490');
+          text.setAttribute('y', '260');
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('fill', '#4b5563');
+          text.textContent = 'Brak danych PCB';
+          pcbChart.appendChild(text);
+          return;
+        }
+
+        ensurePcbLimits();
+
+        const W = 980, H = 540;
+        const M = { t: 24, r: 64, b: 72, l: 64 };
+        const plotW = W - M.l - M.r;
+        const plotH = H - M.t - M.b;
+        const points = pcbRows
+          .map((row, idx) => ({ idx, row, x: row.closed.getTime(), y: row.cycleTime }))
+          .sort((a, b) => a.x - b.x);
+
+        const minX = Math.min(...points.map((point) => point.x));
+        const maxX = Math.max(...points.map((point) => point.x));
+        const minY = 0;
+        const maxY = Math.max(
+          ...points.map((point) => point.y),
+          Number.isFinite(pcbUmplValue) ? pcbUmplValue : 0,
+          Number.isFinite(pcbLnplValue) ? pcbLnplValue : 0,
+          1
+        );
+        const xSpan = Math.max(maxX - minX, 1);
+        const ySpan = Math.max(maxY - minY, 1);
+        const xScale = (x) => M.l + ((x - minX) / xSpan) * plotW;
+        const yScale = (y) => H - M.b - ((y - minY) / ySpan) * plotH;
+
+        for (let i = 0; i <= 5; i++) {
+          const y = H - M.b - (i / 5) * plotH;
+          const val = Number(((maxY / 5) * i).toFixed(1));
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(M.l));
+          line.setAttribute('x2', String(W - M.r));
+          line.setAttribute('y1', String(y));
+          line.setAttribute('y2', String(y));
+          line.setAttribute('stroke', '#9ca3af');
+          pcbChart.appendChild(line);
+
+          const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          txt.setAttribute('x', String(M.l - 8));
+          txt.setAttribute('y', String(y + 4));
+          txt.setAttribute('text-anchor', 'end');
+          txt.setAttribute('font-size', '11');
+          txt.setAttribute('fill', '#1f2937');
+          txt.textContent = String(val);
+          pcbChart.appendChild(txt);
+        }
+
+        const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        xAxis.setAttribute('x1', String(M.l));
+        xAxis.setAttribute('y1', String(H - M.b));
+        xAxis.setAttribute('x2', String(W - M.r));
+        xAxis.setAttribute('y2', String(H - M.b));
+        xAxis.setAttribute('stroke', '#111827');
+        pcbChart.appendChild(xAxis);
+
+        const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        yAxis.setAttribute('x1', String(M.l));
+        yAxis.setAttribute('y1', String(M.t));
+        yAxis.setAttribute('x2', String(M.l));
+        yAxis.setAttribute('y2', String(H - M.b));
+        yAxis.setAttribute('stroke', '#111827');
+        pcbChart.appendChild(yAxis);
+
+        const xTicks = Math.min(6, Math.max(points.length - 1, 1));
+        for (let i = 0; i <= xTicks; i++) {
+          const ts = minX + (xSpan / xTicks) * i;
+          const x = xScale(ts);
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', String(x));
+          label.setAttribute('y', String(H - M.b + 18));
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('font-size', '10');
+          label.setAttribute('fill', '#1f2937');
+          label.textContent = displayDate(new Date(ts));
+          pcbChart.appendChild(label);
+        }
+
+        const linePoints = points.map((point) => `${xScale(point.x)},${yScale(point.y)}`).join(' ');
+        if (linePoints) {
+          const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+          polyline.setAttribute('points', linePoints);
+          polyline.setAttribute('fill', 'none');
+          polyline.setAttribute('stroke', '#111827');
+          polyline.setAttribute('stroke-width', '2');
+          pcbChart.appendChild(polyline);
+        }
+
+        const renderLimitLine = (value, color, labelText) => {
+          if (!Number.isFinite(value)) return;
+          const y = yScale(value);
+          const limitLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          limitLine.setAttribute('x1', String(M.l));
+          limitLine.setAttribute('x2', String(W - M.r));
+          limitLine.setAttribute('y1', String(y));
+          limitLine.setAttribute('y2', String(y));
+          limitLine.setAttribute('stroke', color);
+          limitLine.setAttribute('stroke-width', '2');
+          limitLine.setAttribute('stroke-dasharray', '8 5');
+          pcbChart.appendChild(limitLine);
+
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', String(W - M.r + 6));
+          label.setAttribute('y', String(y + 4));
+          label.setAttribute('font-size', '11');
+          label.setAttribute('fill', color);
+          label.textContent = `${labelText}: ${value}`;
+          pcbChart.appendChild(label);
+        };
+
+        renderLimitLine(pcbUmplValue, '#dc2626', 'UMPL');
+        renderLimitLine(pcbLnplValue, '#2563eb', 'LNPL');
+
+        points.forEach((pointData) => {
+          const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          point.setAttribute('cx', String(xScale(pointData.x)));
+          point.setAttribute('cy', String(yScale(pointData.y)));
+          point.setAttribute('r', '5');
+          point.setAttribute('fill', '#374151');
+          point.setAttribute('stroke', '#111827');
+          point.setAttribute('stroke-width', '1');
+          point.style.cursor = 'pointer';
+          point.setAttribute('tabindex', '0');
+          point.setAttribute('role', 'button');
+          point.setAttribute(
+            'aria-label',
+            `Edytuj punkt PCB ${pointData.row.id}: Started ${displayDate(pointData.row.started)}, Closed ${displayDate(pointData.row.closed)}, Cycle Time ${pointData.row.cycleTime}`
+          );
+
+          const openEditor = () => {
+            pcbEditContext = pointData.idx;
+            pcbEditorText.textContent = `Edycja punktu PCB ${pointData.row.id}`;
+            pcbEditId.value = String(pointData.row.id);
+            pcbEditStarted.value = toDateInputValue(pointData.row.started);
+            pcbEditClosed.value = toDateInputValue(pointData.row.closed);
+            pcbEditCycleTime.value = String(pointData.row.cycleTime);
+            pcbEditor.classList.add('active');
+            setStatus(pcbStatus, '');
+          };
+
+          point.addEventListener('click', openEditor);
+          point.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openEditor();
+            }
+          });
+          pcbChart.appendChild(point);
+        });
+      };
+
+      const renderPcbTable = () => {
+        pcbTableBody.innerHTML = pcbRows.map((row, idx) => `
+          <tr data-index="${idx}">
+            <td>${idx + 1}</td>
+            <td><input class="pcb-id" type="number" min="1" step="1" value="${row.id}" /></td>
+            <td><input class="pcb-started" type="date" value="${toDateInputValue(row.started)}" /></td>
+            <td><input class="pcb-closed" type="date" value="${toDateInputValue(row.closed)}" /></td>
+            <td><input class="pcb-cycle-time" type="number" min="0" step="0.01" value="${row.cycleTime}" /></td>
+            <td><button type="button" class="pcb-delete">Usuń</button></td>
+          </tr>
+        `).join('');
+      };
+
+      const renderPcbAll = () => {
+        renderPcb();
+        renderPcbTable();
+      };
+
+      pcbUmpl.addEventListener('change', () => {
+        const value = parseNumeric(pcbUmpl.value);
+        if (!Number.isFinite(value) || value < 0) {
+          setStatus(pcbStatus, 'UMPL musi być liczbą >= 0.', true);
+          pcbUmpl.value = String(pcbUmplValue ?? 0);
+          return;
+        }
+        if (Number.isFinite(pcbLnplValue) && value < pcbLnplValue) {
+          setStatus(pcbStatus, 'UMPL nie może być mniejszy od LNPL.', true);
+          pcbUmpl.value = String(pcbUmplValue ?? 0);
+          return;
+        }
+        pcbUmplValue = value;
+        renderPcb();
+        setStatus(pcbStatus, 'Zaktualizowano linię UMPL.');
+      });
+
+      pcbLnpl.addEventListener('change', () => {
+        const value = parseNumeric(pcbLnpl.value);
+        if (!Number.isFinite(value) || value < 0) {
+          setStatus(pcbStatus, 'LNPL musi być liczbą >= 0.', true);
+          pcbLnpl.value = String(pcbLnplValue ?? 0);
+          return;
+        }
+        if (Number.isFinite(pcbUmplValue) && value > pcbUmplValue) {
+          setStatus(pcbStatus, 'LNPL nie może być większy od UMPL.', true);
+          pcbLnpl.value = String(pcbLnplValue ?? 0);
+          return;
+        }
+        pcbLnplValue = value;
+        renderPcb();
+        setStatus(pcbStatus, 'Zaktualizowano linię LNPL.');
+      });
+
+      pcbAddRow.addEventListener('click', () => {
+        const now = new Date();
+        pcbRows.push({ id: maxPcbId() + 1, started: now, closed: now, cycleTime: 0 });
+        renderPcbAll();
+        setStatus(pcbStatus, 'Dodano nowy wiersz PCB.');
+      });
+
+      pcbTableBody.addEventListener('change', (e) => {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const idx = Number(tr.dataset.index);
+        if (!Number.isInteger(idx) || !pcbRows[idx]) return;
+        const row = pcbRows[idx];
+
+        if (e.target.classList.contains('pcb-id')) {
+          const id = Number(e.target.value);
+          if (!Number.isInteger(id) || id < 1) {
+            setStatus(pcbStatus, 'ID musi być liczbą całkowitą >= 1.', true);
+            e.target.value = String(row.id);
+            return;
+          }
+          row.id = id;
+        }
+
+        if (e.target.classList.contains('pcb-started')) {
+          const started = fromDateInputValue(e.target.value);
+          if (!started) {
+            setStatus(pcbStatus, 'Niepoprawna data Started.', true);
+            e.target.value = toDateInputValue(row.started);
+            return;
+          }
+          row.started = started;
+        }
+
+        if (e.target.classList.contains('pcb-closed')) {
+          const closed = fromDateInputValue(e.target.value);
+          if (!closed) {
+            setStatus(pcbStatus, 'Niepoprawna data Closed.', true);
+            e.target.value = toDateInputValue(row.closed);
+            return;
+          }
+          row.closed = closed;
+        }
+
+        if (e.target.classList.contains('pcb-cycle-time')) {
+          const cycleTime = parseNumeric(e.target.value);
+          if (!Number.isFinite(cycleTime) || cycleTime < 0) {
+            setStatus(pcbStatus, 'Cycle Time musi być liczbą >= 0.', true);
+            e.target.value = String(row.cycleTime);
+            return;
+          }
+          row.cycleTime = cycleTime;
+        }
+
+        renderPcbAll();
+        setStatus(pcbStatus, 'Zaktualizowano dane PCB.');
+      });
+
+      pcbTableBody.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('pcb-delete')) return;
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        const idx = Number(tr.dataset.index);
+        if (!Number.isInteger(idx) || !pcbRows[idx]) return;
+        pcbRows.splice(idx, 1);
+        if (!pcbRows.length) {
+          pcbUmplValue = null;
+          pcbLnplValue = null;
+        }
+        renderPcbAll();
+        setStatus(pcbStatus, 'Usunięto wiersz PCB.');
+      });
+
+      pcbEditSave.addEventListener('click', () => {
+        if (pcbEditContext === null) return;
+        const idx = Number(pcbEditContext);
+        const target = pcbRows[idx];
+        if (!target) return;
+
+        const id = Number(pcbEditId.value);
+        const started = fromDateInputValue(pcbEditStarted.value);
+        const closed = fromDateInputValue(pcbEditClosed.value);
+        const cycleTime = parseNumeric(pcbEditCycleTime.value);
+
+        if (!Number.isInteger(id) || id < 1) {
+          setStatus(pcbStatus, 'Niepoprawne ID punktu PCB.', true);
+          return;
+        }
+        if (!started) {
+          setStatus(pcbStatus, 'Niepoprawna data Started punktu PCB.', true);
+          return;
+        }
+        if (!closed) {
+          setStatus(pcbStatus, 'Niepoprawna data Closed punktu PCB.', true);
+          return;
+        }
+        if (!Number.isFinite(cycleTime) || cycleTime < 0) {
+          setStatus(pcbStatus, 'Niepoprawny Cycle Time punktu PCB.', true);
+          return;
+        }
+
+        target.id = id;
+        target.started = started;
+        target.closed = closed;
+        target.cycleTime = cycleTime;
+        pcbEditContext = null;
+        pcbEditor.classList.remove('active');
+        renderPcbAll();
+        setStatus(pcbStatus, 'Zapisano edycję punktu PCB.');
+      });
+
+      pcbEditCancel.addEventListener('click', () => {
+        pcbEditContext = null;
+        pcbEditor.classList.remove('active');
+        setStatus(pcbStatus, 'Anulowano edycję punktu PCB.');
+      });
+
       try {
-        const [histRes, scatterRes] = await Promise.all([fetch(HIST_CSV), fetch(SCATTER_CSV)]);
+        const [histRes, scatterRes, pcbRes] = await Promise.all([fetch(HIST_CSV), fetch(SCATTER_CSV), fetch(PCB_CSV)]);
         if (!histRes.ok) throw new Error('Nie udało się wczytać pliku histogramu.');
         if (!scatterRes.ok) throw new Error('Nie udało się wczytać pliku scatterplot.');
+        if (!pcbRes.ok) throw new Error('Nie udało się wczytać pliku PCB.');
 
         const histRaw = await histRes.text();
         const scatterRaw = await scatterRes.text();
+        const pcbRaw = await pcbRes.text();
 
         histRows = histRaw
           .split(/\r?\n/)
@@ -890,11 +1344,34 @@
           })
           .filter(Boolean);
 
+        pcbRows = pcbRaw
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .slice(1)
+          .map((line) => {
+            const [idRaw, startedRaw, closedRaw, cycleTimeRaw] = line.split(';').map((v) => v.trim());
+            const id = Number(idRaw);
+            const started = parseUsDateFromCsv(startedRaw);
+            const closed = parseUsDateFromCsv(closedRaw);
+            const cycleTime = parseNumeric(cycleTimeRaw);
+            return Number.isInteger(id) && id > 0 && started && closed && Number.isFinite(cycleTime)
+              ? { id, started, closed, cycleTime }
+              : null;
+          })
+          .filter(Boolean);
+
         if (!histRows.length) throw new Error('Brak poprawnych danych histogramu.');
         if (!scatterRows.length) throw new Error('Brak poprawnych danych scatterplot.');
+        if (!pcbRows.length) throw new Error('Brak poprawnych danych PCB.');
+
+        const pcbLimits = computePcbLimits(pcbRows);
+        pcbUmplValue = pcbLimits.umpl;
+        pcbLnplValue = pcbLimits.lnpl;
 
         renderHistogramAll();
         renderScatterAll();
+        renderPcbAll();
         errorEl.style.display = 'none';
       } catch (error) {
         console.error(error);
