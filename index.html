@@ -262,6 +262,13 @@
       <div class="legend">
         <span class="legend-item"><span class="legend-color" style="background:#dc2626"></span><span style="font-weight:700;color:#dc2626">UMPL</span></span>
         <span class="legend-item"><span class="legend-color" style="background:#2563eb"></span><span style="font-weight:700;color:#2563eb">LNPL</span></span>
+        <span class="legend-item"><span class="legend-color" style="background:#16a34a"></span><span style="font-weight:700;color:#16a34a">Średnia</span></span>
+      </div>
+      <svg id="pcbMrChart" viewBox="0 0 980 540" preserveAspectRatio="none" aria-label="Wykres PCB moving ranges"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-color" style="background:#111827"></span><span style="font-weight:700;color:#111827">MR</span></span>
+        <span class="legend-item"><span class="legend-color" style="background:#dc2626"></span><span style="font-weight:700;color:#dc2626">URL = 3,27MR</span></span>
+        <span class="legend-item"><span class="legend-color" style="background:#2563eb"></span><span style="font-weight:700;color:#2563eb">LRL = -3,27MR</span></span>
       </div>
       <div id="pcbEditor" class="editor" aria-live="polite">
         <div id="pcbEditorText"></div>
@@ -350,6 +357,7 @@
       const scatterEditCancel = document.getElementById('scatterEditCancel');
 
       const pcbChart = document.getElementById('pcbChart');
+      const pcbMrChart = document.getElementById('pcbMrChart');
       const pcbUmpl = document.getElementById('pcbUmpl');
       const pcbLnpl = document.getElementById('pcbLnpl');
       const pcbTableBody = document.getElementById('pcbTableBody');
@@ -1001,12 +1009,14 @@
         const points = pcbRows
           .map((row, idx) => ({ idx, row, x: row.closed.getTime(), y: row.cycleTime }))
           .sort((a, b) => a.x - b.x);
+        const meanCycleTime = points.reduce((acc, point) => acc + point.y, 0) / points.length;
 
         const minX = Math.min(...points.map((point) => point.x));
         const maxX = Math.max(...points.map((point) => point.x));
         const minY = 0;
         const maxY = Math.max(
           ...points.map((point) => point.y),
+          Number.isFinite(meanCycleTime) ? meanCycleTime : 0,
           Number.isFinite(pcbUmplValue) ? pcbUmplValue : 0,
           Number.isFinite(pcbLnplValue) ? pcbLnplValue : 0,
           1
@@ -1079,6 +1089,7 @@
 
         const renderLimitLine = (value, color, labelText) => {
           if (!Number.isFinite(value)) return;
+          const displayValue = Number(value.toFixed(2));
           const y = yScale(value);
           const limitLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
           limitLine.setAttribute('x1', String(M.l));
@@ -1095,12 +1106,13 @@
           label.setAttribute('y', String(y + 4));
           label.setAttribute('font-size', '11');
           label.setAttribute('fill', color);
-          label.textContent = `${labelText}: ${value}`;
+          label.textContent = `${labelText}: ${displayValue}`;
           pcbChart.appendChild(label);
         };
 
         renderLimitLine(pcbUmplValue, '#dc2626', 'UMPL');
         renderLimitLine(pcbLnplValue, '#2563eb', 'LNPL');
+        renderLimitLine(meanCycleTime, '#16a34a', 'Średnia');
 
         points.forEach((pointData) => {
           const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1140,6 +1152,149 @@
         });
       };
 
+      const getPcbMovingRanges = () => {
+        const points = pcbRows
+          .map((row) => ({ x: row.closed.getTime(), y: row.cycleTime }))
+          .sort((a, b) => a.x - b.x);
+        if (points.length < 2) return [];
+        const movingRanges = [];
+        for (let i = 1; i < points.length; i++) {
+          movingRanges.push({ x: points[i].x, mr: points[i].y - points[i - 1].y });
+        }
+        return movingRanges;
+      };
+
+      const renderPcbMr = () => {
+        pcbMrChart.innerHTML = '';
+        const movingRanges = getPcbMovingRanges();
+        if (!movingRanges.length) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', '490');
+          text.setAttribute('y', '260');
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('fill', '#4b5563');
+          text.textContent = 'Za mało danych PCB do wykresu MR';
+          pcbMrChart.appendChild(text);
+          return;
+        }
+
+        const mrAverage = movingRanges.reduce((acc, point) => acc + Math.abs(point.mr), 0) / movingRanges.length;
+        const url = 3.27 * mrAverage;
+        const lrl = -3.27 * mrAverage;
+
+        const W = 980, H = 540;
+        const M = { t: 24, r: 72, b: 72, l: 64 };
+        const Y_TICK_COUNT = 5;
+        const MAX_X_TICKS = 6;
+        const plotW = W - M.l - M.r;
+        const plotH = H - M.t - M.b;
+
+        const minX = Math.min(...movingRanges.map((point) => point.x));
+        const maxX = Math.max(...movingRanges.map((point) => point.x));
+        const minY = Math.min(...movingRanges.map((point) => point.mr), lrl, 0);
+        const maxY = Math.max(...movingRanges.map((point) => point.mr), url, 0, 1);
+        const xSpan = Math.max(maxX - minX, 1);
+        const ySpan = Math.max(maxY - minY, 1);
+        const xScale = (x) => M.l + ((x - minX) / xSpan) * plotW;
+        const yScale = (y) => H - M.b - ((y - minY) / ySpan) * plotH;
+
+        for (let i = 0; i <= Y_TICK_COUNT; i++) {
+          const y = H - M.b - (i / Y_TICK_COUNT) * plotH;
+          const val = Number((minY + (ySpan / Y_TICK_COUNT) * i).toFixed(2));
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(M.l));
+          line.setAttribute('x2', String(W - M.r));
+          line.setAttribute('y1', String(y));
+          line.setAttribute('y2', String(y));
+          line.setAttribute('stroke', '#9ca3af');
+          pcbMrChart.appendChild(line);
+
+          const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          txt.setAttribute('x', String(M.l - 8));
+          txt.setAttribute('y', String(y + 4));
+          txt.setAttribute('text-anchor', 'end');
+          txt.setAttribute('font-size', '11');
+          txt.setAttribute('fill', '#1f2937');
+          txt.textContent = String(val);
+          pcbMrChart.appendChild(txt);
+        }
+
+        const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        xAxis.setAttribute('x1', String(M.l));
+        xAxis.setAttribute('y1', String(yScale(0)));
+        xAxis.setAttribute('x2', String(W - M.r));
+        xAxis.setAttribute('y2', String(yScale(0)));
+        xAxis.setAttribute('stroke', '#111827');
+        pcbMrChart.appendChild(xAxis);
+
+        const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        yAxis.setAttribute('x1', String(M.l));
+        yAxis.setAttribute('y1', String(M.t));
+        yAxis.setAttribute('x2', String(M.l));
+        yAxis.setAttribute('y2', String(H - M.b));
+        yAxis.setAttribute('stroke', '#111827');
+        pcbMrChart.appendChild(yAxis);
+
+        const xTicks = Math.min(MAX_X_TICKS, Math.max(movingRanges.length - 1, 1));
+        for (let i = 0; i <= xTicks; i++) {
+          const ts = minX + (xSpan / xTicks) * i;
+          const x = xScale(ts);
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', String(x));
+          label.setAttribute('y', String(H - M.b + 18));
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('font-size', '10');
+          label.setAttribute('fill', '#1f2937');
+          label.textContent = displayDate(new Date(ts));
+          pcbMrChart.appendChild(label);
+        }
+
+        const linePoints = movingRanges.map((point) => `${xScale(point.x)},${yScale(point.mr)}`).join(' ');
+        if (linePoints) {
+          const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+          polyline.setAttribute('points', linePoints);
+          polyline.setAttribute('fill', 'none');
+          polyline.setAttribute('stroke', '#111827');
+          polyline.setAttribute('stroke-width', '2');
+          pcbMrChart.appendChild(polyline);
+        }
+
+        const renderLimitLine = (value, color, labelText) => {
+          const y = yScale(value);
+          const limitLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          limitLine.setAttribute('x1', String(M.l));
+          limitLine.setAttribute('x2', String(W - M.r));
+          limitLine.setAttribute('y1', String(y));
+          limitLine.setAttribute('y2', String(y));
+          limitLine.setAttribute('stroke', color);
+          limitLine.setAttribute('stroke-width', '2');
+          limitLine.setAttribute('stroke-dasharray', '8 5');
+          pcbMrChart.appendChild(limitLine);
+
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', String(W - M.r + 6));
+          label.setAttribute('y', String(y + 4));
+          label.setAttribute('font-size', '11');
+          label.setAttribute('fill', color);
+          label.textContent = `${labelText}: ${Number(value.toFixed(2))}`;
+          pcbMrChart.appendChild(label);
+        };
+
+        renderLimitLine(url, '#dc2626', 'URL');
+        renderLimitLine(lrl, '#2563eb', 'LRL');
+
+        movingRanges.forEach((pointData) => {
+          const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          point.setAttribute('cx', String(xScale(pointData.x)));
+          point.setAttribute('cy', String(yScale(pointData.mr)));
+          point.setAttribute('r', '5');
+          point.setAttribute('fill', '#374151');
+          point.setAttribute('stroke', '#111827');
+          point.setAttribute('stroke-width', '1');
+          pcbMrChart.appendChild(point);
+        });
+      };
+
       const renderPcbTable = () => {
         pcbTableBody.innerHTML = pcbRows.map((row, idx) => `
           <tr data-index="${idx}">
@@ -1155,6 +1310,7 @@
 
       const renderPcbAll = () => {
         renderPcb();
+        renderPcbMr();
         renderPcbTable();
       };
 
