@@ -406,8 +406,8 @@
         const dt = new Date(y, m - 1, d);
         return Number.isNaN(dt.getTime()) ? null : dt;
       };
-      const parseUsDateFromCsv = (usDateString) => {
-        const parts = String(usDateString || '').trim().split('.');
+      const parseUsMdyDateFromCsv = (usDateString) => {
+        const parts = String(usDateString || '').trim().split(/[./-]/);
         if (parts.length !== 3) return null;
         const [m, d, y] = parts.map((p) => Number(p));
         if (!d || !m || !y) return null;
@@ -1258,6 +1258,8 @@
         if (!pcbRows.length) {
           pcbUmplValue = null;
           pcbLnplValue = null;
+          pcbUmpl.value = '';
+          pcbLnpl.value = '';
         }
         renderPcbAll();
         setStatus(pcbStatus, 'Usunięto wiersz PCB.');
@@ -1352,8 +1354,8 @@
           .map((line) => {
             const [idRaw, startedRaw, closedRaw, cycleTimeRaw] = line.split(';').map((v) => v.trim());
             const id = Number(idRaw);
-            const started = parseUsDateFromCsv(startedRaw);
-            const closed = parseUsDateFromCsv(closedRaw);
+            const started = parseUsMdyDateFromCsv(startedRaw);
+            const closed = parseUsMdyDateFromCsv(closedRaw);
             const cycleTime = parseNumeric(cycleTimeRaw);
             return Number.isInteger(id) && id > 0 && started && closed && Number.isFinite(cycleTime)
               ? { id, started, closed, cycleTime }
